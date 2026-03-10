@@ -1,0 +1,7 @@
+{
+    # Set a real email via ACME_EMAIL at runtime.
+    email {$ACME_EMAIL}
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+import /sites/*.caddy

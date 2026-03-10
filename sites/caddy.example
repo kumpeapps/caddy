@@ -1,0 +1,21 @@
+# Copy this file to /sites/<name>.caddy and replace domains/upstream.
+# This default file is recreated at container startup if missing.
+www.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+
+        # Equivalent to --dnssleep 120 in acme.sh.
+        propagation_delay 2m
+        propagation_timeout 10m
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+example.com {
+    redir https://www.example.com{uri} permanent
+}

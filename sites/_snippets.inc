@@ -135,58 +135,43 @@
 # RATE LIMITING
 # =============================================================================
 (rate_limit_general) {
-    rate_limit {
-        zone general {
-            key {remote_host}
-            events 300
-            window 1m
-        }
+    rate_limit general {
+        key {remote_host}
+        events 300
+        window 1m
     }
-    rate_limit general
 }
 
 (rate_limit_api) {
-    rate_limit {
-        zone api {
-            key {remote_host}
-            events 100
-            window 1m
-        }
+    rate_limit api {
+        key {remote_host}
+        events 100
+        window 1m
     }
-    rate_limit api
 }
 
 (rate_limit_login) {
-    rate_limit {
-        zone login {
-            key {remote_host}
-            events 5
-            window 5m
-        }
+    rate_limit login {
+        key {remote_host}
+        events 5
+        window 5m
     }
-    rate_limit login
 }
 
 (rate_limit_strict) {
-    rate_limit {
-        zone strict {
-            key {remote_host}
-            events 50
-            window 1m
-        }
+    rate_limit strict {
+        key {remote_host}
+        events 50
+        window 1m
     }
-    rate_limit strict
 }
 
 (rate_limit_lenient) {
-    rate_limit {
-        zone lenient {
-            key {remote_host}
-            events 1000
-            window 1m
-        }
+    rate_limit lenient {
+        key {remote_host}
+        events 1000
+        window 1m
     }
-    rate_limit lenient
 }
 
 # =============================================================================

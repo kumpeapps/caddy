@@ -5,8 +5,8 @@
 }
 
 # Import reusable snippets and matchers globally
-import /sites/_snippets.inc
-import /sites/_matchers.inc
+import /usr/local/share/caddy/_snippets.inc
+import /usr/local/share/caddy/_matchers.inc
 
 # Import all site configurations
 import /sites/*.caddy

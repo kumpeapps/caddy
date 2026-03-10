@@ -122,7 +122,7 @@ rate_limit {
 
 The setup includes 30+ prebuilt snippets in `_snippets.inc` and `_matchers.inc` that are automatically available to all your site configurations.
 
-**Note:** The snippets and matchers are globally imported in the main Caddyfile, so you don't need to import them in individual site files.
+**Note:** The snippets and matchers are globally imported in the main Caddyfile from `/usr/local/share/caddy/`, so you don't need to import them in individual site files. They're available to all your `.caddy` configurations in `/sites/`.
 
 ### Using Snippets
 
@@ -246,20 +246,32 @@ See [sites/example-with-snippets.caddy](sites/example-with-snippets.caddy) for c
 
 ## File Structure
 
+### Source Code Structure
+
 ```text
 /
 ├── Caddyfile                       # Main Caddy configuration
 ├── Dockerfile                      # Multi-stage build with plugins
 ├── docker-entrypoint.sh            # Startup script
-├── sites/                          # Site configurations
+├── sites/                          # Site configurations (source)
 │   ├── _snippets.inc              # 20+ reusable configuration snippets
 │   ├── _matchers.inc              # Pre-built request matchers
 │   ├── caddy.example              # Basic reverse proxy example
 │   ├── redirect.example           # Simple redirects example
 │   ├── bot-protection.example     # Bot protection examples
-│   └── example-with-snippets.caddy # Examples using snippets
+│   └── example-with-snippets.caddy.example # Examples using snippets
 └── README.md
 ```
+
+### Container Structure
+
+Inside the running container:
+
+- **`/etc/caddy/Caddyfile`** - Main configuration
+- **`/usr/local/share/caddy/`** - Shared resources (snippets, matchers, examples)
+- **`/sites/`** - Your site configurations (mount your configs here)
+- **`/data/`** - Caddy data (certificates, etc.)
+- **`/config/`** - Caddy config cache
 
 ## Security Best Practices
 

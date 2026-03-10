@@ -2,25 +2,44 @@
 # This default file is recreated at container startup if missing.
 # Keep all hosts in one site block so DNS-01 is used for all names
 # and one certificate can include every hostname listed here.
+
+# Note: Snippets and matchers are automatically imported globally in Caddyfile
+
 www.example.com, example.com, privacy.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
+    # Automatic HTTPS with CloudNS DNS-01 challenge
+    import cloudns_dns
+    
+    # Security headers for all responses
+    import security_headers
+    
+    # Basic bot protection
+    import bot_protection
+    
+    # Block common exploit attempts
+    import exploit_protection
+    
+    # General rate limiting (300 req/min per IP)
+    import rate_limit_general
+    
+    # Enable compression
+    import compression
+    
+    # Cache static assets
+    import static_cache
+    
+    # Enable logging
+    import log_common
+    
+    # Redirect apex domain to www
+    import apex_to_www
 
-        # Equivalent to --dnssleep 120 in acme.sh.
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
-    }
-
-    @apex host example.com
-    redir @apex https://www.example.com{uri} permanent
-
+    # Redirect privacy subdomain to third party
     @privacy host privacy.example.com
     redir @privacy https://thirdparty.example.com/privacy{uri} permanent
 
+    # Main application (www subdomain)
     @app host www.example.com
-    reverse_proxy @app http://127.0.0.1:8080
+    reverse_proxy @app http://127.0.0.1:8080 {
+        import reverse_proxy_defaults
+    }
 }

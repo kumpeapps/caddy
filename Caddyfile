@@ -4,4 +4,9 @@
 	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
+# Import reusable snippets and matchers globally
+import /sites/_snippets.inc
+import /sites/_matchers.inc
+
+# Import all site configurations
 import /sites/*.caddy

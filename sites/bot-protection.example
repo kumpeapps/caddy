@@ -1,0 +1,241 @@
+# Copy this file to /sites/<name>.caddy and customize for your needs.
+# This example demonstrates various bot protection techniques.
+
+(bot_protection) {
+    # Block known bad bots by User-Agent
+    @bad_bots {
+        header User-Agent *bot*
+        header User-Agent *spider*
+        header User-Agent *crawler*
+        header User-Agent *AhrefsBot*
+        header User-Agent *MJ12bot*
+        header User-Agent *SemrushBot*
+        header User-Agent *DotBot*
+        header User-Agent *PetalBot*
+        header User-Agent *BLEXBot*
+        header User-Agent *Baiduspider*
+        header User-Agent *YandexBot*
+        header User-Agent *curl*
+        header User-Agent *wget*
+        header User-Agent *python-requests*
+    }
+    
+    # Allow legitimate bots (whitelist)
+    @good_bots {
+        header User-Agent *Googlebot*
+        header User-Agent *bingbot*
+        header User-Agent *Slackbot*
+        header User-Agent *DuckDuckBot*
+        header User-Agent *facebookexternalhit*
+        header User-Agent *LinkedInBot*
+        header User-Agent *TwitterBot*
+    }
+    
+    # Block requests without proper headers
+    @suspicious {
+        not header User-Agent *
+        not header Referer *
+    }
+    
+    # Block common exploit paths
+    @exploit_paths {
+        path *.php
+        path *.asp
+        path *.aspx
+        path *.jsp
+        path *wp-admin*
+        path *wp-login*
+        path *phpmyadmin*
+        path *.env*
+        path *.git*
+        path *.sql
+        path */.well-known/security.txt
+    }
+    
+    # Apply blocks (but allow good bots through)
+    handle @bad_bots {
+        abort
+    }
+    
+    handle @suspicious {
+        abort
+    }
+    
+    handle @exploit_paths {
+        respond "Not Found" 404
+    }
+    
+    # Rate limiting for API endpoints (adjust as needed)
+    rate_limit {
+        zone api {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+        
+        zone login {
+            key {remote_host}
+            events 5
+            window 5m
+        }
+        
+        zone general {
+            key {remote_host}
+            events 300
+            window 1m
+        }
+    }
+}
+
+# Example 1: Basic site with bot protection
+bot-protected.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+    
+    # Import bot protection rules
+    import bot_protection
+    
+    # Apply general rate limiting
+    rate_limit general
+    
+    # Your application
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 2: API with strict rate limiting
+api.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+    
+    # Import bot protection rules
+    import bot_protection
+    
+    # Strict API rate limiting
+    @api_endpoints path /api/*
+    handle @api_endpoints {
+        rate_limit api
+        reverse_proxy http://127.0.0.1:8080
+    }
+    
+    # Login endpoint with very strict limits
+    @login path /login /auth/*
+    handle @login {
+        rate_limit login
+        reverse_proxy http://127.0.0.1:8080
+    }
+    
+    # Default handler
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 3: Static site with minimal bot protection
+static.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+    
+    # Block only the worst offenders
+    @really_bad_bots {
+        header User-Agent *AhrefsBot*
+        header User-Agent *SemrushBot*
+        header User-Agent *MJ12bot*
+        header User-Agent *PetalBot*
+    }
+    
+    handle @really_bad_bots {
+        abort
+    }
+    
+    # Very lenient rate limiting
+    rate_limit {
+        zone static {
+            key {remote_host}
+            events 1000
+            window 1m
+        }
+    }
+    rate_limit static
+    
+    root * /var/www/html
+    file_server
+}
+
+# Example 4: E-commerce site with comprehensive protection
+shop.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+    
+    # Import all bot protection rules
+    import bot_protection
+    
+    # Checkout endpoints - strictest limits
+    @checkout path /checkout /payment /order
+    handle @checkout {
+        rate_limit {
+            zone checkout {
+                key {remote_host}
+                events 10
+                window 1m
+            }
+        }
+        rate_limit checkout
+        reverse_proxy http://127.0.0.1:8080
+    }
+    
+    # Admin panel - very strict
+    @admin path /admin/*
+    handle @admin {
+        # Basic auth for admin (add user:password hash)
+        basicauth {
+            admin $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG
+        }
+        
+        rate_limit login
+        reverse_proxy http://127.0.0.1:8080
+    }
+    
+    # Product pages - moderate limits
+    @products path /products/* /category/*
+    handle @products {
+        rate_limit {
+            zone products {
+                key {remote_host}
+                events 200
+                window 1m
+            }
+        }
+        rate_limit products
+        reverse_proxy http://127.0.0.1:8080
+    }
+    
+    # General traffic
+    rate_limit general
+    reverse_proxy http://127.0.0.1:8080
+}

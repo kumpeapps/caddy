@@ -1,6 +1,7 @@
 # Example site configuration using snippets
 # Copy this file to create your own site configuration
-# Note: Snippets and matchers are automatically imported globally in Caddyfile
+# Note: Snippets are automatically imported globally in Caddyfile
+# Matchers must be imported per-site or defined inline (as shown in these examples)
 
 # =============================================================================
 # EXAMPLE 1: Basic Website with Security

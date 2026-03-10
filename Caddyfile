@@ -4,9 +4,9 @@
 	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
-# Import reusable snippets and matchers globally
+# Import reusable snippets globally
+# Note: Matchers cannot be imported globally - import them in site blocks if needed
 import /usr/local/share/caddy/_snippets.inc
-import /usr/local/share/caddy/_matchers.inc
 
 # Import all site configurations
 import /sites/*.caddy

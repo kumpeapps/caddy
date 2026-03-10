@@ -3,7 +3,7 @@
 # Keep all hosts in one site block so DNS-01 is used for all names
 # and one certificate can include every hostname listed here.
 
-# Note: Snippets and matchers are automatically imported globally in Caddyfile
+# Note: Snippets are automatically imported globally in Caddyfile
 
 www.example.com, example.com, privacy.example.com {
     # Automatic HTTPS with CloudNS DNS-01 challenge

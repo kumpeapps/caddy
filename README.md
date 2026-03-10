@@ -120,9 +120,9 @@ rate_limit {
 
 ## Reusable Snippets
 
-The setup includes 30+ prebuilt snippets in `_snippets.inc` and `_matchers.inc` that are automatically available to all your site configurations.
+The setup includes 30+ prebuilt snippets in `_snippets.inc` and pre-built matchers in `_matchers.inc`.
 
-**Note:** The snippets and matchers are globally imported in the main Caddyfile from `/usr/local/share/caddy/`, so you don't need to import them in individual site files. They're available to all your `.caddy` configurations in `/sites/`.
+**Note:** Snippets are globally imported in the main Caddyfile from `/usr/local/share/caddy/`, so you can use them directly in any `.caddy` file. However, **matchers must be imported within individual site blocks** due to Caddy's scoping rules.
 
 ### Using Snippets
 
@@ -180,7 +180,7 @@ Simply use any snippet with the `import` directive in your .caddy files:
 
 ### Available Matchers
 
-Pre-built matchers in `_matchers.inc`:
+Pre-built matchers in `_matchers.inc` (optional - import in site blocks if needed):
 
 - **Methods**: `@safe_methods`, `@unsafe_methods`
 - **Content**: `@api_request`, `@form_submit`
@@ -189,7 +189,32 @@ Pre-built matchers in `_matchers.inc`:
 - **Security**: `@no_referer`, `@no_user_agent`, `@local`, `@external`
 - **Bots**: `@search_engines`, `@social_media_bots`, `@monitoring_bots`
 
-### Example Usage
+### Using Matchers
+
+If you want to use the pre-built matchers, import them **inside your site block**:
+
+```caddyfile
+example.com {
+    # Import matchers inside the site block
+    import /usr/local/share/caddy/_matchers.inc
+    
+    import cloudns_dns
+    import security_headers
+    
+    # Now you can use the matchers
+    handle @admin {
+        import rate_limit_strict
+        reverse_proxy http://localhost:9000
+    }
+    
+    handle @static_assets {
+        import static_cache
+        reverse_proxy http://localhost:8080
+    }
+}
+```
+
+### Example Usage (Without Matchers)
 
 ```caddyfile
 example.com {

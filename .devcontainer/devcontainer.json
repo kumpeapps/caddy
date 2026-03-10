@@ -1,0 +1,129 @@
+{
+	"name": "Caddy Development",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"version": "latest",
+			"moby": true
+		},
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": true,
+			"installOhMyZsh": true,
+			"upgradePackages": true,
+			"username": "vscode",
+			"userUid": "1000",
+			"userGid": "1000"
+		}
+	},
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				// GitHub Copilot
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				
+				// Git QuickOps
+				"kumpeappsllc.git-quickops",
+				
+				// Docker support
+				"ms-azuretools.vscode-docker",
+				
+				// Shell scripting
+				"timonwong.shellcheck",
+				"foxundermoon.shell-format",
+				
+				// Markdown
+				"yzhang.markdown-all-in-one",
+				"DavidAnson.vscode-markdownlint",
+				
+				// YAML/JSON
+				"redhat.vscode-yaml",
+				
+				// Caddyfile syntax
+				"matthewpi.caddyfile-support",
+				
+				// General utilities
+				"streetsidesoftware.code-spell-checker",
+				"aaron-bond.better-comments",
+				"usernamehw.errorlens"
+			],
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "zsh",
+				"terminal.integrated.profiles.linux": {
+					"zsh": {
+						"path": "/bin/zsh"
+					}
+				},
+				"files.eol": "\n",
+				"files.insertFinalNewline": true,
+				"files.trimTrailingWhitespace": true,
+				"editor.formatOnSave": true,
+				"editor.tabSize": 4,
+				"editor.insertSpaces": true,
+				"[markdown]": {
+					"editor.tabSize": 2,
+					"editor.wordWrap": "on"
+				},
+				"[yaml]": {
+					"editor.tabSize": 2
+				},
+				"[json]": {
+					"editor.tabSize": 2
+				},
+				"shellcheck.enable": true,
+				"shellcheck.run": "onSave",
+				"github.copilot.enable": {
+					"*": true,
+					"yaml": true,
+					"plaintext": false,
+					"markdown": true,
+					"caddyfile": true
+				}
+			}
+		}
+	},
+
+	// Mount docker socket for building images
+	"mounts": [
+		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+	],
+
+	// Run commands after container creation
+	"postCreateCommand": "docker --version && git --version && echo 'Development environment ready!'",
+
+	// Forward ports for testing
+	"forwardPorts": [80, 443, 2019],
+	"portsAttributes": {
+		"80": {
+			"label": "HTTP",
+			"onAutoForward": "notify"
+		},
+		"443": {
+			"label": "HTTPS",
+			"onAutoForward": "notify"
+		},
+		"2019": {
+			"label": "Caddy Admin API",
+			"onAutoForward": "ignore"
+		}
+	},
+
+	// Set environment variables
+	"remoteEnv": {
+		"DOCKER_BUILDKIT": "1"
+	},
+
+	// User to run as
+	"remoteUser": "vscode",
+
+	// Keep container running
+	"runArgs": ["--init"]
+}

@@ -298,6 +298,41 @@ Inside the running container:
 - **`/data/`** - Caddy data (certificates, etc.)
 - **`/config/`** - Caddy config cache
 
+## Development
+
+This project includes a VS Code devcontainer for easy development. See [.devcontainer/README.md](.devcontainer/README.md) for detailed instructions.
+
+### Quick Start with DevContainer
+
+1. **Open in VS Code**: Open this project in VS Code with the Dev Containers extension installed
+2. **Reopen in Container**: Press `F1` → "Dev Containers: Reopen in Container"
+3. **Start Developing**: All required tools and extensions are pre-installed
+
+### Building the Docker Image
+
+```bash
+# Build the custom Caddy image
+docker build -t caddy-custom .
+
+# Run with your configurations
+docker run -d \
+  -p 80:80 \
+  -p 443:443 \
+  -v $PWD/sites:/sites:ro \
+  -e ACME_EMAIL=your@email.com \
+  caddy-custom
+```
+
+### Testing Configuration Changes
+
+```bash
+# Validate Caddy configuration
+docker run --rm -v $PWD/sites:/sites caddy-custom caddy validate --config /etc/caddy/Caddyfile
+
+# Check for syntax errors
+docker run --rm -v $PWD/sites:/sites caddy-custom caddy fmt --overwrite /sites/yoursite.caddy
+```
+
 ## Security Best Practices
 
 1. **Always use HTTPS**: The setup automatically provisions SSL certificates

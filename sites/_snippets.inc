@@ -135,7 +135,7 @@
 # RATE LIMITING
 # =============================================================================
 (rate_limit_general) {
-    rate_limit general {
+    rate_limit {
         key {remote_host}
         events 300
         window 1m
@@ -143,7 +143,7 @@
 }
 
 (rate_limit_api) {
-    rate_limit api {
+    rate_limit {
         key {remote_host}
         events 100
         window 1m
@@ -151,7 +151,7 @@
 }
 
 (rate_limit_login) {
-    rate_limit login {
+    rate_limit {
         key {remote_host}
         events 5
         window 5m
@@ -159,7 +159,7 @@
 }
 
 (rate_limit_strict) {
-    rate_limit strict {
+    rate_limit {
         key {remote_host}
         events 50
         window 1m
@@ -167,7 +167,7 @@
 }
 
 (rate_limit_lenient) {
-    rate_limit lenient {
+    rate_limit {
         key {remote_host}
         events 1000
         window 1m

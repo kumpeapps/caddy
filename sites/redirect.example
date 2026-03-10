@@ -1,0 +1,16 @@
+# HTTPS redirect example.
+# Copy to /sites/<name>.caddy and replace domains.
+# This config redirects one HTTPS hostname to another HTTPS URL.
+old.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    redir https://new.example.com{uri} permanent
+}

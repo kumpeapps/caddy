@@ -1,7 +1,8 @@
 # Copy this file to /sites/<name>.caddy and replace domains/upstream.
 # This default file is recreated at container startup if missing.
-# Keep both hosts in one site block so DNS-01 is used for both certs.
-www.example.com, example.com {
+# Keep all hosts in one site block so DNS-01 is used for all names
+# and one certificate can include every hostname listed here.
+www.example.com, example.com, privacy.example.com {
     tls {
         dns cloudns {
             auth_id {$CLOUDNS_AUTH_ID}
@@ -17,5 +18,9 @@ www.example.com, example.com {
     @apex host example.com
     redir @apex https://www.example.com{uri} permanent
 
-    reverse_proxy http://127.0.0.1:8080
+    @privacy host privacy.example.com
+    redir @privacy https://thirdparty.example.com/privacy{uri} permanent
+
+    @app host www.example.com
+    reverse_proxy @app http://127.0.0.1:8080
 }

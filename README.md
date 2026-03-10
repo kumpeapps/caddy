@@ -48,6 +48,12 @@ A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge
       caddy-custom
     ```
 
+**Tip:** If your site configurations are managed via Git or another version control system, you can mount `/sites` as read-only to prevent accidental modifications:
+
+```bash
+-v $(pwd)/sites:/sites:ro
+```
+
 ## Bot Protection
 
 The setup includes comprehensive bot protection features. See `sites/bot-protection.example` for detailed examples.
@@ -262,8 +268,13 @@ See [sites/example-with-snippets.caddy](sites/example-with-snippets.caddy) for c
 1. **Monitor Logs**: Check Caddy logs for blocked requests
 1. **Update Regularly**: Keep Caddy and plugins up to date
 1. **Whitelist Carefully**: Only whitelist bots you actually want to allow
+1. **Use Read-Only Mounts**: When managing configs via Git, mount `/sites` as read-only (`:ro`) to prevent accidental modifications
 
 ## Troubleshooting
+
+### Container won't start with read-only /sites mount?
+
+The entrypoint script gracefully handles read-only mounts. If you see this issue, ensure your .caddy files exist in the /sites directory before starting the container. Example files won't be copied to read-only mounts.
 
 ### Bot protection too strict?
 

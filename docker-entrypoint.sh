@@ -7,15 +7,19 @@ example_dst="${sites_dir}/caddy.example"
 redirect_src="/usr/local/share/caddy/redirect.example"
 redirect_dst="${sites_dir}/redirect.example"
 
-mkdir -p "${sites_dir}"
+# Check if /sites is writable
+if [ -w "${sites_dir}" ] || mkdir -p "${sites_dir}" 2>/dev/null; then
+    # Keep a default example config available, especially for newly mounted /sites volumes.
+    # Only copy if the directory is writable (not read-only mounted)
+    if [ ! -f "${example_dst}" ]; then
+        cp "${example_src}" "${example_dst}" 2>/dev/null || echo "Note: /sites is read-only, skipping example file copy"
+    fi
 
-# Keep a default example config available, especially for newly mounted /sites volumes.
-if [ ! -f "${example_dst}" ]; then
-    cp "${example_src}" "${example_dst}"
-fi
-
-if [ ! -f "${redirect_dst}" ]; then
-    cp "${redirect_src}" "${redirect_dst}"
+    if [ ! -f "${redirect_dst}" ]; then
+        cp "${redirect_src}" "${redirect_dst}" 2>/dev/null || echo "Note: /sites is read-only, skipping example file copy"
+    fi
+else
+    echo "Note: /sites is read-only, skipping example file creation"
 fi
 
 if [ "$#" -eq 0 ]; then

@@ -12,7 +12,7 @@ COPY sites/redirect.example /usr/local/share/caddy/redirect.example
 COPY sites/bot-protection.example /usr/local/share/caddy/bot-protection.example
 COPY sites/_snippets.inc /usr/local/share/caddy/_snippets.inc
 COPY sites/_matchers.inc /usr/local/share/caddy/_matchers.inc
-COPY sites/example-with-snippets.caddy /usr/local/share/caddy/example-with-snippets.caddy
+COPY sites/example-with-snippets.caddy.example /usr/local/share/caddy/example-with-snippets.caddy.example
 COPY docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
 

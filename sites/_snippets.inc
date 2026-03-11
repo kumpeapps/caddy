@@ -394,95 +394,113 @@
 # ALTCHA (CAPTCHA-free spam protection)
 # =============================================================================
 # IMPORTANT: ALTCHA requires ALTCHA_HMAC_KEY environment variable
-# Generate with: openssl rand -hex 32
-# If not set, configurations using ALTCHA will fail
-(altcha_basic) {
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-        expires 120
-        max_number 50000
-        verify_url "/.well-known/altcha"
+# Generate with: openssl rand -base64 32
+# Plugin: https://github.com/stardothosting/caddy-altcha
+
+# Challenge generation endpoint - provides cryptographic challenges to clients
+(altcha_challenge_basic) {
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 100000
+            expires 5m
+        }
     }
 }
 
-(altcha_strict) {
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-        expires 60
-        max_number 100000
-        verify_url "/.well-known/altcha"
-        auto_salt true
+(altcha_challenge_strict) {
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 1000000      # Higher difficulty ~200ms solve time
+            expires 2m              # Shorter expiration
+            rate_limit_requests 10  # Prevent DoS
+            rate_limit_window 1m
+        }
     }
 }
 
-(altcha_lenient) {
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-        expires 300
-        max_number 25000
-        verify_url "/.well-known/altcha"
+# Challenge UI page - serves the ALTCHA widget HTML
+(altcha_challenge_page) {
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
     }
 }
 
-(altcha_verify_endpoint) {
-    handle /.well-known/altcha {
-        altcha_verify
+# Verification middleware - protects specific routes
+# Use with matchers to specify which routes to protect
+(altcha_verify_memory) {
+    altcha_verify {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend memory://
+        challenge_redirect /captcha
+        preserve_post_data true
     }
 }
 
-# Custom ALTCHA verification endpoint example:
-# To use a different path, define your own handler instead of importing altcha_verify_endpoint:
-#   handle /custom/verify/path {
-#       altcha_verify
-#   }
-# And update verify_url in your altcha configuration block accordingly.
+(altcha_verify_redis) {
+    altcha_verify {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/0
+        session_ttl 5m
+        challenge_redirect /captcha
+        preserve_post_data true
+        verified_cookie_ttl 3600
+    }
+}
 
 # =============================================================================
-# CADDY-DEFENDER (Advanced security and threat detection)
+# CADDY-DEFENDER (Block AI bots and cloud scrapers)
 # =============================================================================
-(defender_basic) {
-    defender {
-        enable true
-        action block
-        block_duration 3600
-        threshold 10
-        window 60
+# Plugin: https://github.com/JasonLovesDoggo/caddy-defender
+# Purpose: Block or manipulate requests from AI services training on your content
+
+# Block common AI scrapers (OpenAI, DeepSeek, GitHub Copilot, etc.)
+(defender_block_ai) {
+    defender block {
+        ranges openai deepseek githubcopilot
     }
 }
 
-(defender_strict) {
-    defender {
-        enable true
-        action block
-        block_duration 86400
-        threshold 5
-        window 60
-        auto_blacklist true
+# Block all major cloud providers and AI services
+# WARNING: This includes aws, gcloud, and azurepubliccloud which may block
+# legitimate human traffic (corporate VPNs, hosting, CDNs). Use with caution.
+# Consider using defender_block_ai instead for AI-only blocking.
+(defender_block_all_ai) {
+    defender block {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
     }
 }
 
-# NOTE: defender_strict no longer includes a default RFC1918 whitelist for security.
-# If you need to whitelist private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16),
-# define a custom defender block with explicit whitelist configuration.
-# See sites/defender.example for an example (Example 2b).
-
-(defender_lenient) {
-    defender {
-        enable true
-        action log
-        threshold 50
-        window 60
+# Return garbage data to pollute AI training
+(defender_garbage_ai) {
+    defender garbage {
+        ranges openai deepseek githubcopilot
     }
 }
 
-(defender_challenge) {
-    defender {
-        enable true
-        action challenge
-        block_duration 1800
-        threshold 15
-        window 60
-        challenge_timeout 300
-        challenge_max_attempts 3
+# Redirect AI bots to a different page
+(defender_redirect_ai) {
+    defender redirect {
+        ranges openai deepseek githubcopilot
+        url /ai-bot-notice
+    }
+}
+
+# Tarpit (slow down) AI bots
+(defender_tarpit_ai) {
+    defender tarpit {
+        ranges openai deepseek githubcopilot aws gcloud
+    }
+}
+
+# Drop connections from AI bots
+(defender_drop_ai) {
+    defender drop {
+        ranges openai deepseek githubcopilot
     }
 }

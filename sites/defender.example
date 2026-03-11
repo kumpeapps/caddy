@@ -1,88 +1,19 @@
 # Copy this file to /sites/<name>.caddy and customize for your needs.
-# This example demonstrates Caddy-Defender integration for advanced security.
+# This example demonstrates Caddy-Defender integration using JasonLovesDoggo/caddy-defender plugin.
+#
+# Caddy-Defender blocks AI training bots and cloud scrapers that ignore robots.txt.
+# It uses IP range lists to identify known AI bot networks (OpenAI, DeepSeek, AWS, etc.)
+#
+# Plugin: https://github.com/JasonLovesDoggo/caddy-defender
+# Purpose: Protect your content from AI training scrapers
+#
+# IMPORTANT: This is NOT for general security. Use for blocking AI bots only.
 
-# Caddy-Defender provides:
-# - IP blacklisting/whitelisting
-# - Automatic threat detection
-# - Request pattern analysis
-# - Advanced rate limiting with custom rules
-# - Real-time attack mitigation
-
-# Basic Defender Configuration
-(defender_basic) {
-    defender {
-        # Enable defender module
-        enable true
-
-        # Action to take when threat is detected
-        # Options: block, log, challenge
-        action block
-
-        # Block duration for detected threats (in seconds)
-        block_duration 3600
-
-        # Threshold for suspicious activity
-        threshold 10
-
-        # Time window for threshold calculation (in seconds)
-        window 60
-    }
-}
-
-# Strict Defender Configuration (for high-security sites)
-(defender_strict) {
-    defender {
-        enable true
-        action block
-
-        # Longer block duration
-        block_duration 86400
-
-        # Lower threshold (more sensitive)
-        threshold 5
-        window 60
-
-        # Enable automatic blacklisting
-        auto_blacklist true
-    }
-}
-
-# NOTE: defender_strict no longer includes a default RFC1918 whitelist for security.
-# If you need to whitelist private networks, define them explicitly as shown in Example 2b.
-
-# Lenient Defender Configuration (for development/testing)
-(defender_lenient) {
-    defender {
-        enable true
-
-        # Log instead of block during development
-        action log
-
-        threshold 50
-        window 60
-    }
-}
-
-# Challenge Mode (CAPTCHA-like behavior)
-(defender_challenge) {
-    defender {
-        enable true
-
-        # Challenge suspicious users instead of blocking
-        action challenge
-
-        block_duration 1800
-        threshold 15
-        window 60
-
-        # Challenge settings
-        challenge_timeout 300
-        challenge_max_attempts 3
-    }
-}
-
-# Example 1: Basic API protection with Defender
-api-protected.example.com {
+# =============================================================================
+# EXAMPLE 1: Block All AI Training Bots (Recommended)
+# =============================================================================
+blog.example.com {
+    # DNS-01 challenge for automatic HTTPS
     tls {
         dns cloudns {
             auth_id {$CLOUDNS_AUTH_ID}
@@ -93,30 +24,200 @@ api-protected.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    # Apply basic defender protection
-    import defender_basic
+    import security_headers
 
-    # API endpoints
-    @api path /api/*
+    # Block OpenAI, DeepSeek, GitHub Copilot, and cloud providers
+    defender block {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+        message "AI training bots are not permitted. Respect robots.txt."
+    }
 
-    handle @api {
-        # Combine with rate limiting
-        rate_limit {
-            zone api {
-                key {remote_host}
-                events 100
-                window 1m
-            }
+    # Your content
+    root * /var/www/blog
+    file_server
+    php_fastcgi unix//run/php/php8.2-fpm.sock
+}
+
+# =============================================================================
+# EXAMPLE 2: Return Garbage Data (Poison AI Training)
+# =============================================================================
+api.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
         }
-        rate_limit api
-        reverse_proxy http://127.0.0.1:3000
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Return random garbage to pollute AI training data
+    defender garbage {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+    }
+
+    # Real API endpoint
+    reverse_proxy http://127.0.0.1:3000
+}
+
+# =============================================================================
+# EXAMPLE 3: Redirect to Notice Page
+# =============================================================================
+docs.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    import security_headers
+
+    # Redirect AI bots to a notice page explaining your policy
+    defender redirect {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+        url https://docs.example.com/ai-bot-policy
+    }
+
+    # AI bot policy page (exempted)
+    @policy path /ai-bot-policy
+    handle @policy {
+        respond <<HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Bot Policy</title>
+</head>
+<body>
+    <h1>Automated Access Notice</h1>
+    <p>This website does not permit automated scraping or AI training.</p>
+    <p>Please respect our robots.txt file.</p>
+    <p>For licensing inquiries, contact: legal@example.com</p>
+</body>
+</html>
+HTML 200
+    }
+
+    # Documentation content
+    root * /var/www/docs
+    file_server
+}
+
+# =============================================================================
+# EXAMPLE 4: Tarpit (Slow Response)
+# =============================================================================
+portfolio.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Slow down AI bots with delayed responses
+    defender tarpit {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+    }
+
+    # Your portfolio site
+    root * /var/www/portfolio
+    file_server
+}
+
+# =============================================================================
+# EXAMPLE 5: Drop Connection (Silent Ignore)
+# =============================================================================
+creative.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Silently drop connections from AI bots (no response)
+    defender drop {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+    }
+
+    # Your creative content
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# =============================================================================
+# EXAMPLE 6: Selective Protection (Different Actions per Bot)
+# =============================================================================
+shop.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    import security_headers
+
+    # Block specific AI companies
+    defender block {
+        ranges openai deepseek
+        message "OpenAI and DeepSeek bots are not permitted."
+    }
+
+    # Return garbage to GitHub Copilot
+    defender garbage {
+        ranges githubcopilot
+    }
+
+    # Tarpit cloud providers
+    defender tarpit {
+        ranges aws gcloud azurepubliccloud
+    }
+
+    # E-commerce application
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# =============================================================================
+# EXAMPLE 7: Custom IP Ranges with Block
+# =============================================================================
+custom.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Block custom IP ranges alongside known AI bots
+    defender block {
+        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud custom
+        custom_ranges 192.0.2.0/24 203.0.113.0/24
+        message "Automated access not permitted."
     }
 
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 2: Admin panel with strict protection
-admin.example.com {
+# =============================================================================
+# EXAMPLE 8: Protect Specific Routes Only
+# =============================================================================
+mixed.example.com {
     tls {
         dns cloudns {
             auth_id {$CLOUDNS_AUTH_ID}
@@ -127,404 +228,160 @@ admin.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    # Strict defender for admin area
-    import defender_strict
+    import security_headers
 
-    # Additional security headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        X-XSS-Protection "1; mode=block"
-        Referrer-Policy "no-referrer"
-        Permissions-Policy "geolocation=(), microphone=(), camera=()"
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    # Block AI bots on premium content routes only
+    @premium {
+        path /premium/* /members/*
     }
 
-    # Login attempts protection
-    @login path /login /auth/*
-
-    handle @login {
-        # Very strict rate limiting on login
-        rate_limit {
-            zone login {
-                key {remote_host}
-                events 3
-                window 10m
-            }
+    handle @premium {
+        defender block {
+            ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+            message "AI training bots not allowed on premium content."
         }
-        rate_limit login
-        reverse_proxy http://127.0.0.1:9000
-    }
-
-    reverse_proxy http://127.0.0.1:9000
-}
-
-# Example 2b: Internal admin with private network whitelist (if needed)
-# Use this pattern ONLY if you trust all traffic from RFC1918 networks
-internal-admin.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
-    }
-
-    # Strict defender with explicit private network whitelist
-    # Start with defender_strict, then add custom whitelist
-    defender {
-        enable true
-        action block
-        block_duration 86400
-        threshold 5
-        window 60
-        auto_blacklist true
-
-        # Explicitly whitelist RFC1918 networks
-        # ONLY use this if you genuinely trust ALL internal network traffic
-        # This whitelists: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-        whitelist {
-            10.0.0.0/8
-            172.16.0.0/12
-            192.168.0.0/16
-        }
-    }
-
-    # Additional security headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-    }
-
-    reverse_proxy http://127.0.0.1:9000
-}
-
-# Example 3: Public site with challenge mode
-public.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
-    }
-
-    # Challenge suspicious traffic
-    import defender_challenge
-
-    # Allow search engine bots
-    @good_bots {
-        header User-Agent *Googlebot*
-        header User-Agent *bingbot*
-        header User-Agent *DuckDuckBot*
-        header User-Agent *Slackbot*
-    }
-
-    handle @good_bots {
-        # Skip defender for known good bots
         reverse_proxy http://127.0.0.1:8080
     }
 
-    # Regular traffic gets defender protection
+    # Allow public content to be indexed
+    handle {
+        reverse_proxy http://127.0.0.1:8080
+    }
+}
+
+# =============================================================================
+# EXAMPLE 9: Using Snippets (Simplified Configuration)
+# =============================================================================
+simple.example.com {
+    import cloudns_dns
+    import security_headers
+
+    # Use pre-configured defender snippet
+    import defender_block_ai
+
+    # Your application
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 4: E-commerce with layered protection
-shop-secure.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
+# =============================================================================
+# EXAMPLE 10: Combining with ALTCHA (Multi-Layer Protection)
+# =============================================================================
+secure.example.com {
+    import cloudns_dns
+    order altcha_verify before reverse_proxy
+    import security_headers
+
+    # Layer 1: Block AI training bots
+    import defender_block_ai
+
+    # Layer 2: ALTCHA challenge endpoint
+    import altcha_challenge_basic
+
+    # Layer 3: ALTCHA verification on forms
+    @forms {
+        path /contact /register /login
+        method POST
     }
 
-    # Defender configuration with custom rules
-    defender {
-        enable true
-        action block
-        block_duration 7200
-        threshold 20
-        window 60
-
-        # Whitelist your office/VPN IPs
-        whitelist {
-            # Example IPs - replace with your actual IPs
-            # 203.0.113.0/24
-        }
-
-        # Blacklist known bad actors
-        blacklist {
-            # Example - replace with actual bad IPs
-            # 198.51.100.0/24
-        }
-
-        # Enable GeoIP blocking (if configured)
-        # block_countries CN RU
+    altcha_verify @forms {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/0
+        challenge_redirect /captcha
+        preserve_post_data true
     }
 
-    # Checkout protection
-    @checkout path /checkout* /payment* /order*
-
-    handle @checkout {
-        # Extra strict for payment processing
-        rate_limit {
-            zone checkout {
-                key {remote_host}
-                events 5
-                window 5m
-            }
-        }
-        rate_limit checkout
-        reverse_proxy http://127.0.0.1:8080
-    }
-
-    # Product browsing
-    @products path /products* /category* /search*
-
-    handle @products {
-        rate_limit {
-            zone products {
-                key {remote_host}
-                events 200
-                window 1m
-            }
-        }
-        rate_limit products
-        reverse_proxy http://127.0.0.1:8080
-    }
-
-    # Cart operations
-    @cart path /cart*
-
-    handle @cart {
-        rate_limit {
-            zone cart {
-                key {remote_host}
-                events 50
-                window 1m
-            }
-        }
-        rate_limit cart
+    # Layer 4: Rate limiting
+    @contact path /contact
+    handle @contact {
+        import rate_limit_contact
         reverse_proxy http://127.0.0.1:8080
     }
 
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 5: Combined Defender + Bot Protection
-comprehensive.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
-    }
+# =============================================================================
+# AVAILABLE IP RANGES
+# =============================================================================
+#
+# Built-in ranges (updated regularly by plugin):
+# - openai          OpenAI GPT crawlers
+# - deepseek        DeepSeek AI training bots
+# - githubcopilot   GitHub Copilot training sources
+# - aws             Amazon Web Services IP ranges
+# - gcloud          Google Cloud Platform IP ranges
+# - azurepubliccloud  Microsoft Azure public cloud IP ranges
+# - custom          Your own IP ranges (requires custom_ranges parameter)
+#
+# To see current IP ranges:
+# https://github.com/JasonLovesDoggo/caddy-defender/tree/main/ranges
 
-    # Defender protection
-    import defender_basic
+# =============================================================================
+# AVAILABLE ACTIONS
+# =============================================================================
+#
+# block      Return 403 Forbidden with optional message
+# garbage    Return random garbage data (pollute training)
+# redirect   HTTP 302 redirect to specified URL
+# tarpit     Slow response (waste bot resources)
+# drop       Silently drop connection (no response)
 
-    # Block bad bots
-    @bad_bots {
-        header User-Agent *bot*
-        header User-Agent *spider*
-        header User-Agent *crawler*
-        header User-Agent *AhrefsBot*
-        header User-Agent *MJ12bot*
-        header User-Agent *SemrushBot*
-        header User-Agent *DotBot*
-        header User-Agent *PetalBot*
-    }
+# =============================================================================
+# USAGE NOTES
+# =============================================================================
+#
+# 1. Purpose: This plugin blocks AI training bots that scrape content.
+#    It is NOT for general security, malware, or DDoS protection.
+#
+# 2. robots.txt: Always have a robots.txt file that disallows AI bots.
+#    Example:
+#      User-agent: GPTBot
+#      User-agent: ChatGPT-User
+#      User-agent: Google-Extended
+#      User-agent: CCBot
+#      User-agent: anthropic-ai
+#      User-agent: Claude-Web
+#      Disallow: /
+#
+# 3. Legal: Blocking AI bots is currently legal in most jurisdictions.
+#    The plugin helps enforce your robots.txt policy.
+#
+# 4. Performance: IP range checks are fast and have minimal overhead.
+#    Use 'block' action for best performance.
+#
+# 5. Updates: The plugin automatically pulls updated IP ranges.
+#    Keep your Caddy installation updated for latest ranges.
+#
+# 6. Testing: To test if blocking works, use a VPN or proxy from a cloud provider.
+#    AWS/GCloud/Azure IPs will trigger the defender.
+#
+# 7. Whitelisting: If you need to allow specific IPs from blocked ranges,
+#    use a @whitelist matcher before the defender directive:
+#
+#    @whitelist {
+#        remote_ip 203.0.113.45
+#    }
+#    handle @whitelist {
+#        reverse_proxy http://127.0.0.1:8080
+#    }
+#
+#    defender block {
+#        ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+#    }
 
-    # Allow good bots
-    @good_bots {
-        header User-Agent *Googlebot*
-        header User-Agent *bingbot*
-        header User-Agent *DuckDuckBot*
-        header User-Agent *Slackbot*
-    }
-
-    # Block bad bots
-    handle @bad_bots {
-        respond "Forbidden" 403
-    }
-
-    # Block common exploit paths
-    @exploit_paths {
-        path *.php
-        path *.asp
-        path *.aspx
-        path *wp-admin*
-        path *wp-login*
-        path *.env*
-        path *.git*
-    }
-
-    handle @exploit_paths {
-        respond "Not Found" 404
-    }
-
-    # Security headers
-    header {
-        Strict-Transport-Security "max-age=31536000"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-    }
-
-    # Allow good bots without rate limiting
-    handle @good_bots {
-        reverse_proxy http://127.0.0.1:8080
-    }
-
-    # Rate limit regular traffic
-    rate_limit {
-        zone general {
-            key {remote_host}
-            events 300
-            window 1m
-        }
-    }
-    rate_limit general
-
-    reverse_proxy http://127.0.0.1:8080
-}
-
-# Example 6: Development mode with logging only
-dev.example.com {
-    tls internal
-
-    # Lenient defender for development
-    import defender_lenient
-
-    # Enable detailed logging
-    log {
-        output file /var/log/caddy/dev-access.log
-        format json
-        level DEBUG
-    }
-
-    reverse_proxy http://127.0.0.1:8080
-}
-
-# Example 7: Multi-tier protection
-enterprise.example.com {
-    tls {
-        dns cloudns {
-            auth_id {$CLOUDNS_AUTH_ID}
-            auth_password {$CLOUDNS_AUTH_PASSWORD}
-        }
-        propagation_delay 2m
-        propagation_timeout -1
-        resolvers 1.1.1.1 8.8.8.8
-    }
-
-    # Custom defender with advanced settings
-    defender {
-        enable true
-        action block
-        block_duration 21600  # 6 hours
-        threshold 8
-        window 60
-
-        # SECURITY WARNING: Whitelist internal networks only if you trust all traffic from them
-        # Untrusted clients on VPN/overlay networks will bypass protection
-        # Consider using defender_private_network_whitelist snippet or defining specific IPs
-        whitelist {
-            10.0.0.0/8
-            172.16.0.0/12
-            192.168.0.0/16
-        }
-
-        # Enable auto-learning (adapts to traffic patterns)
-        auto_learn true
-
-        # Store blocked IPs to database/file for persistence
-        persistence true
-        storage_path /data/defender
-
-        # Enable distributed mode for multi-instance deployments
-        distributed true
-        redis_addr {$REDIS_ADDR}
-    }
-
-    # Public API with defender
-    @public_api path /api/public/*
-
-    handle @public_api {
-        rate_limit {
-            zone public_api {
-                key {remote_host}
-                events 50
-                window 1m
-            }
-        }
-        rate_limit public_api
-        reverse_proxy http://127.0.0.1:3000
-    }
-
-    # Private API requires auth + defender
-    @private_api {
-        path /api/v1/*
-        header Authorization *
-    }
-
-    handle @private_api {
-        rate_limit {
-            zone private_api {
-                key {header.Authorization}
-                events 200
-                window 1m
-            }
-        }
-        rate_limit private_api
-        reverse_proxy http://127.0.0.1:3000
-    }
-
-    # Admin area with max protection
-    @admin path /admin/*
-
-    handle @admin {
-        # IP whitelist for admin (only allow specific IPs)
-        @allowed_admin {
-            remote_ip 203.0.113.0/24
-        }
-
-        handle @allowed_admin {
-            rate_limit {
-                zone admin {
-                    key {remote_host}
-                    events 50
-                    window 1m
-                }
-            }
-            rate_limit admin
-            reverse_proxy http://127.0.0.1:9000
-        }
-
-        handle {
-            respond "Forbidden" 403
-        }
-    }
-
-    # Default
-    rate_limit {
-        zone general {
-            key {remote_host}
-            events 300
-            window 1m
-        }
-    }
-    rate_limit general
-    reverse_proxy http://127.0.0.1:8080
-}
+# =============================================================================
+# RECOMMENDED CONFIGURATION
+# =============================================================================
+#
+# For most sites, use this simple configuration:
+#
+# yoursite.com {
+#     import cloudns_dns
+#     import security_headers
+#     import defender_block_ai
+#
+#     # Your site configuration
+#     reverse_proxy http://127.0.0.1:8080
+# }
+#
+# This blocks all major AI training bots with a 403 response.

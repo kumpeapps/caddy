@@ -1,65 +1,21 @@
 # Copy this file to /sites/<name>.caddy and customize for your needs.
-# This example demonstrates ALTCHA integration for CAPTCHA-free spam protection.
+# This example demonstrates ALTCHA integration using stardothosting/caddy-altcha plugin.
+#
+# ALTCHA provides privacy-friendly spam protection using cryptographic proof-of-work
+# challenges. No cookies, no tracking, no third-party services required.
+#
+# Plugin: https://github.com/stardothosting/caddy-altcha
+# Documentation: Complete examples at the plugin repository
 
-# ALTCHA provides a privacy-friendly alternative to traditional CAPTCHAs
-# using cryptographic challenges instead of image recognition.
+# IMPORTANT: Set ALTCHA_HMAC_KEY environment variable before starting Caddy
+# Generate with: openssl rand -base64 32
+# This key MUST be the same in both altcha_challenge and altcha_verify handlers
 
-# Basic ALTCHA Configuration
-(altcha_basic) {
-    altcha {
-        # Secret key for HMAC signing (REQUIRED - generate a strong random key)
-        # Keep this secret and never expose it publicly
-        # Generate with: openssl rand -hex 32
-        # If not set, Caddy will fail to start - ensure ALTCHA_HMAC_KEY is defined
-        hmac_key {$ALTCHA_HMAC_KEY}
-
-        # Challenge expiration time (default: 120 seconds)
-        expires 120
-
-        # Maximum number of hashes to compute (default: 50000)
-        max_number 50000
-
-        # Verification endpoint (default: /.well-known/altcha)
-        verify_url "/.well-known/altcha"
-    }
-}
-
-# Strict ALTCHA Configuration (for high-security forms)
-(altcha_strict) {
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-
-        # Shorter expiration for sensitive forms
-        expires 60
-
-        # Higher difficulty for attackers
-        max_number 100000
-
-        # Require verification
-        verify_url "/.well-known/altcha"
-
-        # Add salt for extra security
-        auto_salt true
-    }
-}
-
-# Lenient ALTCHA Configuration (for casual forms)
-(altcha_lenient) {
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-
-        # Longer expiration for slow users
-        expires 300
-
-        # Lower difficulty
-        max_number 25000
-
-        verify_url "/.well-known/altcha"
-    }
-}
-
-# Example 1: Basic form protection with ALTCHA
+# =============================================================================
+# EXAMPLE 1: Basic Form Protection (Memory Backend)
+# =============================================================================
 form.example.com {
+    # DNS-01 challenge for automatic HTTPS
     tls {
         dns cloudns {
             auth_id {$CLOUDNS_AUTH_ID}
@@ -70,30 +26,46 @@ form.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    # Import ALTCHA protection
-    import altcha_basic
+    # CRITICAL: Set order for altcha_verify to run before reverse_proxy
+    order altcha_verify before reverse_proxy
 
-    # Serve verification endpoint
-    handle /.well-known/altcha {
-        altcha_verify
+    # Challenge generation endpoint - required for widget
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 100000      # ~20ms solve time
+            expires 5m             # Challenge validity
+        }
     }
 
-    # Protected form endpoint
-    @form_submit {
-        path /submit
+    # Challenge UI page (contains ALTCHA widget)
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
+    }
+
+    # Protect form submission endpoints
+    @protected {
+        path /submit /contact /register
         method POST
     }
 
-    handle @form_submit {
-        # ALTCHA will verify the challenge before allowing through
-        reverse_proxy http://127.0.0.1:8080
+    altcha_verify @protected {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend memory://
+        challenge_redirect /captcha
+        preserve_post_data true    # Restore POST data after verification
     }
 
-    # Regular pages don't need ALTCHA
+    # Your application
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 2: Contact form with strict ALTCHA
+# =============================================================================
+# EXAMPLE 2: Contact Form with Redis (Production Setup)
+# =============================================================================
 contact.example.com {
     tls {
         dns cloudns {
@@ -105,46 +77,63 @@ contact.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    # Use strict ALTCHA for contact forms
-    import altcha_strict
+    order altcha_verify before reverse_proxy
+    import security_headers
 
-    # Security headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-        Referrer-Policy "strict-origin-when-cross-origin"
+    # Challenge endpoint with rate limiting (prevent DoS)
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 1000000         # ~200ms solve time (recommended)
+            expires 5m
+            rate_limit_requests 10     # Max 10 challenges per IP
+            rate_limit_window 1m       # Per minute
+        }
     }
 
-    # ALTCHA verification endpoint
-    handle /.well-known/altcha {
-        altcha_verify
+    # Challenge UI page
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
     }
 
-    # Contact form submission
-    @contact_submit {
+    # Protect contact form with Redis session backend
+    @contact {
         path /contact/submit
         method POST
     }
 
+    altcha_verify @contact {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/0
+        session_ttl 5m
+        challenge_redirect /captcha
+        preserve_post_data true
+
+        # Cookie configuration
+        verified_cookie_name altcha_verified
+        verified_cookie_ttl 3600           # 1 hour
+        verified_cookie_secure true        # HTTPS only
+        verified_cookie_http_only true     # No JS access
+        verified_cookie_same_site Strict   # CSRF protection
+    }
+
+    # Rate limit contact form submissions
+    @contact_submit path /contact/submit
     handle @contact_submit {
-        # Rate limit combined with ALTCHA
-        rate_limit {
-            zone contact {
-                key {remote_host}
-                events 5
-                window 5m
-            }
-        }
-        rate_limit contact
+        import rate_limit_contact
         reverse_proxy http://127.0.0.1:8080
     }
 
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 3: Multi-page site with ALTCHA on specific forms
-app.example.com {
+# =============================================================================
+# EXAMPLE 3: Multi-Route Protection (Authentication + Registration)
+# =============================================================================
+auth.example.com {
     tls {
         dns cloudns {
             auth_id {$CLOUDNS_AUTH_ID}
@@ -155,50 +144,55 @@ app.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    # ALTCHA verification endpoint
-    import altcha_basic
-    handle /.well-known/altcha {
-        altcha_verify
+    order altcha_verify before reverse_proxy
+
+    # Challenge generation
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 1000000
+            expires 5m
+            rate_limit_requests 20
+            rate_limit_window 1m
+        }
     }
 
-    # Protect registration
-    @registration {
-        path /register /signup
+    # Challenge UI
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
+    }
+
+    # Protect multiple authentication routes
+    @auth_routes {
+        path /login /register /reset-password /verify-email
         method POST
     }
 
-    handle @registration {
-        import altcha_strict
+    altcha_verify @auth_routes {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/1   # Use DB 1 for auth
+        session_ttl 5m
+        challenge_redirect /captcha
+        preserve_post_data true
+        verified_cookie_ttl 7200    # 2 hours for auth routes
+    }
+
+    # Strict rate limiting on login attempts
+    @login path /login
+    handle @login {
+        import rate_limit_admin_login
         reverse_proxy http://127.0.0.1:8080
     }
 
-    # Protect password reset
-    @password_reset {
-        path /reset-password
-        method POST
-    }
-
-    handle @password_reset {
-        import altcha_strict
-        reverse_proxy http://127.0.0.1:8080
-    }
-
-    # Protect comments/feedback with lenient ALTCHA
-    @comments {
-        path /comments /feedback
-        method POST
-    }
-
-    handle @comments {
-        import altcha_lenient
-        reverse_proxy http://127.0.0.1:8080
-    }
-
-    # Regular traffic
     reverse_proxy http://127.0.0.1:8080
 }
 
-# Example 4: API with ALTCHA for specific endpoints
+# =============================================================================
+# EXAMPLE 4: API Protection with File Backend
+# =============================================================================
 api.example.com {
     tls {
         dns cloudns {
@@ -210,33 +204,40 @@ api.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    import altcha_basic
+    order altcha_verify before reverse_proxy
 
-    # ALTCHA verification
-    handle /.well-known/altcha {
-        altcha_verify
+    # Challenge endpoint
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-384          # Stronger algorithm
+            max_number 1000000
+            expires 3m                 # Shorter for API
+        }
     }
 
-    # Public API endpoints protected by ALTCHA
+    # Challenge UI
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
+    }
+
+    # Protect public API endpoints (no authentication)
     @public_api {
         path /api/public/*
         method POST PUT DELETE
     }
 
-    handle @public_api {
-        # Combine ALTCHA with rate limiting
-        rate_limit {
-            zone public_api {
-                key {remote_host}
-                events 50
-                window 1m
-            }
-        }
-        rate_limit public_api
-        reverse_proxy http://127.0.0.1:3000
+    altcha_verify @public_api {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend file:///var/lib/caddy/altcha  # File-based persistence
+        session_ttl 5m
+        challenge_redirect /captcha
+        preserve_post_data true
     }
 
-    # Authenticated endpoints don't need ALTCHA
+    # Authenticated API endpoints skip ALTCHA
     @auth_api {
         path /api/v1/*
         header Authorization *
@@ -246,11 +247,19 @@ api.example.com {
         reverse_proxy http://127.0.0.1:3000
     }
 
-    # Default handler
-    respond "Not Found" 404
+    # GET requests don't need ALTCHA
+    @get_requests method GET
+    handle @get_requests {
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    # Default: require ALTCHA or return 403
+    respond "API requires authentication or ALTCHA verification" 403
 }
 
-# Example 5: E-commerce with ALTCHA on checkout
+# =============================================================================
+# EXAMPLE 5: E-commerce with Separate Checkout Protection
+# =============================================================================
 shop.example.com {
     tls {
         dns cloudns {
@@ -262,43 +271,130 @@ shop.example.com {
         resolvers 1.1.1.1 8.8.8.8
     }
 
-    import altcha_strict
+    order altcha_verify before reverse_proxy
+    import security_headers
 
-    # ALTCHA verification
-    handle /.well-known/altcha {
-        altcha_verify
+    # Challenge with strict rate limiting
+    route /api/altcha/challenge {
+        altcha_challenge {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            algorithm SHA-256
+            max_number 1000000
+            expires 5m
+            rate_limit_requests 15
+            rate_limit_window 1m
+        }
     }
 
-    # Extra protection on checkout
+    # Challenge UI
+    route /captcha* {
+        rewrite * /index.html
+        root * /var/www/altcha
+        file_server
+    }
+
+    # Strict protection on checkout/payment
     @checkout {
-        path /checkout /payment
+        path /checkout /payment /order/submit
         method POST
     }
 
-    handle @checkout {
-        # Strict rate limiting + ALTCHA
-        rate_limit {
-            zone checkout {
-                key {remote_host}
-                events 10
-                window 5m
-            }
-        }
-        rate_limit checkout
-        reverse_proxy http://127.0.0.1:8080
+    altcha_verify @checkout {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/2
+        session_ttl 10m              # Longer for checkout process
+        challenge_redirect /captcha
+        preserve_post_data true
+        verified_cookie_ttl 1800     # 30 minutes
     }
 
-    # Cart operations with lenient ALTCHA
+    # Lenient protection on cart/wishlist operations
     @cart {
-        path /cart/*
+        path /cart/* /wishlist/*
         method POST PUT DELETE
     }
 
-    handle @cart {
-        import altcha_lenient
+    altcha_verify @cart {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/2
+        session_ttl 5m
+        challenge_redirect /captcha
+        preserve_post_data false     # Not critical for cart ops
+        verified_cookie_ttl 3600
+    }
+
+    # Rate limit checkout operations
+    @checkout_rate path /checkout /payment
+    handle @checkout_rate {
+        import rate_limit_checkout
         reverse_proxy http://127.0.0.1:8080
     }
 
     # Browse products freely
     reverse_proxy http://127.0.0.1:8080
 }
+
+# =============================================================================
+# EXAMPLE 6: Using Snippets (Simplified Configuration)
+# =============================================================================
+simple.example.com {
+    import cloudns_dns
+    order altcha_verify before reverse_proxy
+    import security_headers
+
+    # Use pre-configured challenge endpoint
+    import altcha_challenge_basic
+
+    # Use pre-configured challenge page
+    import altcha_challenge_page
+
+    # Protect forms with memory backend
+    @forms {
+        path /contact /subscribe /feedback
+        method POST
+    }
+
+    altcha_verify @forms {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend memory://
+        challenge_redirect /captcha
+        preserve_post_data true
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# =============================================================================
+# SETUP INSTRUCTIONS
+# =============================================================================
+#
+# 1. Generate HMAC key:
+#    export ALTCHA_HMAC_KEY=$(openssl rand -base64 32)
+#
+# 2. Create challenge UI directory:
+#    mkdir -p /var/www/altcha
+#
+# 3. Create /var/www/altcha/index.html with ALTCHA widget
+#    See: https://github.com/stardothosting/caddy-altcha/blob/main/examples/www/index.html
+#
+# 4. For Redis backend, ensure Redis is running:
+#    redis-cli ping
+#
+# 5. Test challenge endpoint:
+#    curl https://your-domain.com/api/altcha/challenge
+#
+# 6. Expected JSON response:
+#    {
+#      "algorithm": "SHA-256",
+#      "challenge": "hex-string",
+#      "maxNumber": 100000,
+#      "salt": "hex-string",
+#      "signature": "hmac-signature"
+#    }
+#
+# IMPORTANT NOTES:
+# - The same HMAC key MUST be used in both altcha_challenge and altcha_verify
+# - Use 'order altcha_verify before reverse_proxy' to ensure verification runs first
+# - Session backend is required for preserve_post_data functionality
+# - Memory backend is fine for development but use Redis for production
+# - The verified cookie allows users to make multiple requests without re-verification

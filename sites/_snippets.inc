@@ -9,25 +9,25 @@
     header {
         # Enable HSTS (HTTP Strict Transport Security)
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        
+
         # Prevent MIME type sniffing
         X-Content-Type-Options "nosniff"
-        
+
         # Enable XSS protection
         X-XSS-Protection "1; mode=block"
-        
+
         # Prevent clickjacking
         X-Frame-Options "SAMEORIGIN"
-        
+
         # Referrer policy
         Referrer-Policy "strict-origin-when-cross-origin"
-        
+
         # Permissions policy
         Permissions-Policy "geolocation=(), microphone=(), camera=()"
-        
+
         # Remove server header
         -Server
-        
+
         # Remove X-Powered-By
         -X-Powered-By
     }
@@ -63,7 +63,7 @@
         header User-Agent *Baiduspider*
         header User-Agent *YandexBot*
     }
-    
+
     handle @bad_bots {
         abort
     }
@@ -80,7 +80,7 @@
         header User-Agent *LinkedInBot*
         header User-Agent *TwitterBot*
     }
-    
+
     @bad_bots {
         not header User-Agent *Googlebot*
         not header User-Agent *bingbot*
@@ -94,15 +94,15 @@
         header User-Agent *crawler*
         header User-Agent *scraper*
     }
-    
+
     @suspicious {
         not header User-Agent *
     }
-    
+
     handle @bad_bots {
         abort
     }
-    
+
     handle @suspicious {
         abort
     }
@@ -125,7 +125,7 @@
         path */admin*
         path */login.php*
     }
-    
+
     handle @exploit_paths {
         respond "Not Found" 404
     }
@@ -174,6 +174,39 @@
     }
 }
 
+# Additional commonly-used rate limit patterns
+(rate_limit_checkout) {
+    rate_limit {
+        key {remote_host}
+        events 10
+        window 5m
+    }
+}
+
+(rate_limit_forms) {
+    rate_limit {
+        key {remote_host}
+        events 5
+        window 5m
+    }
+}
+
+(rate_limit_contact) {
+    rate_limit {
+        key {remote_host}
+        events 5
+        window 5m
+    }
+}
+
+(rate_limit_admin_login) {
+    rate_limit {
+        key {remote_host}
+        events 3
+        window 10m
+    }
+}
+
 # =============================================================================
 # CORS (Cross-Origin Resource Sharing)
 # =============================================================================
@@ -181,7 +214,7 @@
     @cors_preflight {
         method OPTIONS
     }
-    
+
     handle @cors_preflight {
         header Access-Control-Allow-Origin "*"
         header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
@@ -189,7 +222,7 @@
         header Access-Control-Max-Age "3600"
         respond "" 204
     }
-    
+
     header Access-Control-Allow-Origin "*"
 }
 
@@ -197,7 +230,7 @@
     @cors_preflight {
         method OPTIONS
     }
-    
+
     handle @cors_preflight {
         header Access-Control-Allow-Origin "{scheme}://{host}"
         header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE"
@@ -206,7 +239,7 @@
         header Access-Control-Max-Age "3600"
         respond "" 204
     }
-    
+
     header Access-Control-Allow-Origin "{scheme}://{host}"
     header Access-Control-Allow-Credentials "true"
 }
@@ -278,7 +311,7 @@
 (file_server_defaults) {
     file_server {
         # Hide dotfiles
-        hide .* 
+        hide .*
         # Enable browsing (remove if you don't want directory listings)
         browse
         # Set index files
@@ -322,7 +355,7 @@
     @static {
         path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp *.avif
     }
-    
+
     header @static {
         Cache-Control "public, max-age=31536000, immutable"
     }
@@ -332,7 +365,7 @@
     @static {
         path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp *.avif
     }
-    
+
     header @static {
         Cache-Control "public, max-age=86400"
     }
@@ -356,3 +389,100 @@
 #         # admin $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG
 #     }
 # }
+
+# =============================================================================
+# ALTCHA (CAPTCHA-free spam protection)
+# =============================================================================
+# IMPORTANT: ALTCHA requires ALTCHA_HMAC_KEY environment variable
+# Generate with: openssl rand -hex 32
+# If not set, configurations using ALTCHA will fail
+(altcha_basic) {
+    altcha {
+        hmac_key {$ALTCHA_HMAC_KEY}
+        expires 120
+        max_number 50000
+        verify_url "/.well-known/altcha"
+    }
+}
+
+(altcha_strict) {
+    altcha {
+        hmac_key {$ALTCHA_HMAC_KEY}
+        expires 60
+        max_number 100000
+        verify_url "/.well-known/altcha"
+        auto_salt true
+    }
+}
+
+(altcha_lenient) {
+    altcha {
+        hmac_key {$ALTCHA_HMAC_KEY}
+        expires 300
+        max_number 25000
+        verify_url "/.well-known/altcha"
+    }
+}
+
+(altcha_verify_endpoint) {
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+}
+
+# Custom ALTCHA verification endpoint example:
+# To use a different path, define your own handler instead of importing altcha_verify_endpoint:
+#   handle /custom/verify/path {
+#       altcha_verify
+#   }
+# And update verify_url in your altcha configuration block accordingly.
+
+# =============================================================================
+# CADDY-DEFENDER (Advanced security and threat detection)
+# =============================================================================
+(defender_basic) {
+    defender {
+        enable true
+        action block
+        block_duration 3600
+        threshold 10
+        window 60
+    }
+}
+
+(defender_strict) {
+    defender {
+        enable true
+        action block
+        block_duration 86400
+        threshold 5
+        window 60
+        auto_blacklist true
+    }
+}
+
+# NOTE: defender_strict no longer includes a default RFC1918 whitelist for security.
+# If you need to whitelist private networks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16),
+# define a custom defender block with explicit whitelist configuration.
+# See sites/defender.example for an example (Example 2b).
+
+(defender_lenient) {
+    defender {
+        enable true
+        action log
+        threshold 50
+        window 60
+    }
+}
+
+(defender_challenge) {
+    defender {
+        enable true
+        action challenge
+        block_duration 1800
+        threshold 15
+        window 60
+        challenge_timeout 300
+        challenge_max_attempts 3
+    }
+}

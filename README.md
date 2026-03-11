@@ -15,10 +15,10 @@ A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge
 
 ## Plugins Included
 
-- **caddy-dns/cloudns**: DNS-01 challenge provider for CloudNS
-- **caddy-ratelimit**: Advanced rate limiting and traffic control
-- **caddy-altcha**: CAPTCHA-free spam protection using cryptographic challenges
-- **caddy-defender**: Advanced security and threat detection system
+- **[caddy-dns/cloudns](https://github.com/caddy-dns/cloudns)**: DNS-01 challenge provider for CloudNS
+- **[caddy-ratelimit](https://github.com/mholt/caddy-ratelimit)**: Advanced rate limiting and traffic control
+- **[caddy-altcha](https://github.com/stardothosting/caddy-altcha)**: CAPTCHA-free spam protection using cryptographic challenges
+- **[caddy-defender](https://github.com/JasonLovesDoggo/caddy-defender)**: Blocks AI bots and cloud services from training on your content
 
 **Note**: Plugin versions are pinned in the [Dockerfile](Dockerfile) for reproducibility. Update the version tags periodically to get security fixes and new features. See each plugin's GitHub releases page for available versions.
 
@@ -31,7 +31,7 @@ A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge
     export CLOUDNS_AUTH_ID=your-auth-id
     export CLOUDNS_AUTH_PASSWORD=your-auth-password
     # Required if using ALTCHA spam protection
-    export ALTCHA_HMAC_KEY=$(openssl rand -hex 32)
+    export ALTCHA_HMAC_KEY=$(openssl rand -base64 32)
     ```
 
 1. Copy and customize your site configuration:
@@ -130,7 +130,7 @@ rate_limit {
 
 ## ALTCHA (CAPTCHA-free Spam Protection)
 
-ALTCHA provides privacy-friendly spam protection using cryptographic challenges instead of traditional CAPTCHAs. No user tracking, no privacy concerns, no accessibility issues.
+ALTCHA provides privacy-friendly spam protection using cryptographic proof-of-work challenges instead of traditional CAPTCHAs. No user tracking, no privacy concerns, no accessibility issues.
 
 See [sites/altcha.example](sites/altcha.example) for detailed configuration examples.
 
@@ -140,86 +140,102 @@ See [sites/altcha.example](sites/altcha.example) for detailed configuration exam
 - **Accessible**: No image recognition or audio challenges
 - **Lightweight**: Pure cryptographic challenge-response
 - **Customizable**: Adjustable difficulty levels for different use cases
+- **Session Support**: Memory, Redis, or file-based session backends
+- **POST Preservation**: Can restore POST data after verification
 
 ### ALTCHA Quick Setup
 
 1. Generate an HMAC key (required):
 
     ```bash
-    export ALTCHA_HMAC_KEY=$(openssl rand -hex 32)
+    export ALTCHA_HMAC_KEY=$(openssl rand -base64 32)
     ```
 
     **Important**: ALTCHA configurations will fail if `ALTCHA_HMAC_KEY` is not set. Always ensure this environment variable is defined before starting Caddy.
 
-2. Use the ALTCHA snippet:
+2. Set the order directive and use ALTCHA handlers:
 
     ```caddyfile
     form.example.com {
         import cloudns_dns
-        import altcha_basic
 
-        # Verification endpoint
-        import altcha_verify_endpoint
+        # REQUIRED: Set order for altcha_verify to run before reverse_proxy
+        order altcha_verify before reverse_proxy
 
-        # Protected form submission
-        @form_submit {
-            path /submit
+        # Challenge generation endpoint
+        import altcha_challenge_basic
+
+        # Challenge UI page
+        import altcha_challenge_page
+
+        # Protect form submissions
+        @forms {
+            path /contact /submit
             method POST
         }
 
-        handle @form_submit {
-            reverse_proxy http://localhost:8080
+        altcha_verify @forms {
+            hmac_key {env.ALTCHA_HMAC_KEY}
+            session_backend memory://
+            challenge_redirect /captcha
+            preserve_post_data true
         }
 
         reverse_proxy http://localhost:8080
     }
     ```
 
-### ALTCHA Variants
+### ALTCHA Snippets
 
-- **`altcha_basic`**: Standard protection (120s expiration, 50k max hashes)
-- **`altcha_strict`**: High security for sensitive forms (60s expiration, 100k max hashes)
-- **`altcha_lenient`**: Casual forms (300s expiration, 25k max hashes)
+- **`altcha_challenge_basic`**: Challenge endpoint with 100k max_number (~20ms solve time)
+- **`altcha_challenge_strict`**: Strict challenge with 1M max_number (~200ms solve time)
+- **`altcha_challenge_page`**: Serves ALTCHA widget HTML at /captcha
+- **`altcha_verify_memory`**: Verification with memory:// session backend
+- **`altcha_verify_redis`**: Verification with redis://localhost:6379/0 backend
 
-### Customizing ALTCHA
+### ALTCHA Components
 
-**Custom Verification Endpoint**: The default verification endpoint is `/.well-known/altcha`. To use a custom path:
+ALTCHA requires two handlers:
 
-1. Define your own handler instead of using `altcha_verify_endpoint`:
+1. **Challenge Generation** (`altcha_challenge`): Creates cryptographic challenges
+   - Route: `/api/altcha/challenge`
+   - Returns JSON with challenge data
+   - Configure: `hmac_key`, `algorithm`, `max_number`, `expires`
 
-    ```caddyfile
-    handle /custom/verify/path {
-        altcha_verify
-    }
-    ```
-
-2. Update the `verify_url` in your ALTCHA configuration:
-
-    ```caddyfile
-    altcha {
-        hmac_key {$ALTCHA_HMAC_KEY}
-        verify_url "/custom/verify/path"
-        expires 120
-        max_number 50000
-    }
-    ```
+2. **Verification** (`altcha_verify`): Validates solutions
+   - Applied to protected routes via matchers
+   - Configure: `hmac_key`, `session_backend`, `challenge_redirect`, `preserve_post_data`
 
 ### Integration Example
 
 ```caddyfile
 contact.example.com {
     import cloudns_dns
-    import altcha_strict
+    order altcha_verify before reverse_proxy
     import security_headers
 
-    # ALTCHA verification
-    handle /.well-known/altcha {
-        altcha_verify
+    # Challenge endpoint (strict protection)
+    import altcha_challenge_strict
+
+    # Challenge UI page
+    import altcha_challenge_page
+
+    # Protect contact form with Redis backend
+    @contact {
+        path /contact/submit
+        method POST
     }
 
-    # Protected contact form with rate limiting
-    @contact path /contact/submit
-    handle @contact {
+    altcha_verify @contact {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/0
+        challenge_redirect /captcha
+        preserve_post_data true
+    }
+
+    # Rate limit form submissions
+    @contact_rate path /contact/submit
+    handle @contact_rate {
         import rate_limit_contact
         reverse_proxy http://localhost:8080
     }
@@ -228,86 +244,114 @@ contact.example.com {
 }
 ```
 
-## Caddy-Defender (Advanced Security)
+## Caddy-Defender (AI Bot Protection)
 
-Caddy-Defender provides enterprise-grade security with automatic threat detection, IP blacklisting, and real-time attack mitigation.
+Caddy-Defender blocks AI training bots and cloud scrapers that ignore robots.txt. It uses IP range lists to identify known AI bot networks (OpenAI, DeepSeek, AWS, etc.).
+
+**Purpose**: This plugin protects your content from AI training scrapers. It is NOT for general security, malware, or DDoS protection.
 
 See [sites/defender.example](sites/defender.example) for comprehensive examples.
 
 ### Defender Key Features
 
-- **Automatic Threat Detection**: Identifies suspicious patterns
-- **IP Blacklisting/Whitelisting**: Dynamic IP management
-- **Challenge Mode**: Alternative to blocking for suspicious traffic
-- **Distributed Support**: Redis-backed for multi-instance deployments
-- **Auto-Learning**: Adapts to your traffic patterns
+- **AI Bot Detection**: Blocks OpenAI, DeepSeek, GitHub Copilot, and other AI scrapers
+- **Cloud Provider Ranges**: AWS, Google Cloud, Azure IP ranges
+- **Multiple Actions**: Block, garbage data, redirect, tarpit, or drop connections
+- **Custom Ranges**: Add your own IP ranges
+- **robots.txt Enforcement**: Technical enforcement of robots.txt policy
 
 ### Defender Quick Setup
 
 ```caddyfile
-secure.example.com {
+blog.example.com {
     import cloudns_dns
-    import defender_basic
     import security_headers
+
+    # Block all major AI training bots
+    import defender_block_ai
 
     reverse_proxy http://localhost:8080
 }
 ```
 
-### Defender Variants
+### Defender Actions
 
-- **`defender_basic`**: Standard protection (blocks threats for 1 hour)
-- **`defender_strict`**: High security with auto-blacklist (24-hour blocks, no default whitelist)
-- **`defender_lenient`**: Development mode (logging only, no blocks)
-- **`defender_challenge`**: Challenge suspicious users instead of blocking
+- **`block`**: Return 403 Forbidden with optional message
+- **`garbage`**: Return random garbage data to pollute AI training
+- **`redirect`**: HTTP 302 redirect to specified URL
+- **`tarpit`**: Slow response to waste bot resources
+- **`drop`**: Silently drop connection (no response)
 
-**Security Note**: The `defender_strict` variant no longer includes a default RFC1918 whitelist. If you need to whitelist private networks, define them explicitly in a custom defender block (see [sites/defender.example](sites/defender.example) Example 2b).
+### Defender Snippets
 
-### Admin Panel Protection
+- **`defender_block_ai`**: Block all AI bots (OpenAI, DeepSeek, GitHub Copilot, AWS, GCloud, Azure)
+- **`defender_block_all_ai`**: Same as defender_block_ai with explicit ranges
+- **`defender_garbage_ai`**: Return garbage data to poison AI training
+- **`defender_redirect_ai`**: Redirect AI bots to /ai-bot-notice page
+- **`defender_tarpit_ai`**: Slow down AI bot requests
+- **`defender_drop_ai`**: Silently drop AI bot connections
+
+### Available IP Ranges
+
+Built-in ranges (updated regularly):
+
+- `openai` - OpenAI GPT crawlers
+- `deepseek` - DeepSeek AI training bots
+- `githubcopilot` - GitHub Copilot training sources
+- `aws` - Amazon Web Services
+- `gcloud` - Google Cloud Platform
+- `azurepubliccloud` - Microsoft Azure
+
+### Selective Protection Example
 
 ```caddyfile
-admin.example.com {
+premium.example.com {
     import cloudns_dns
-    import defender_strict
-    import security_headers_strict
+    import security_headers
 
-    # Extra protection for login with strict rate limiting
-    @login path /login /auth/*
-    handle @login {
-        import rate_limit_admin_login
-        reverse_proxy http://localhost:9000
+    # Block AI bots on premium content only
+    @premium {
+        path /premium/* /members/*
     }
 
-    reverse_proxy http://localhost:9000
+    handle @premium {
+        defender block {
+            ranges openai deepseek githubcopilot aws gcloud azurepubliccloud
+            message "AI training bots not permitted on premium content."
+        }
+        reverse_proxy http://localhost:8080
+    }
+
+    # Allow public content
+    handle {
+        reverse_proxy http://localhost:8080
+    }
 }
 ```
 
 ### Advanced Configuration
 
-For custom threat detection rules:
+Different actions for different bots:
 
 ```caddyfile
-enterprise.example.com {
-    defender {
-        enable true
-        action block
-        block_duration 21600  # 6 hours
-        threshold 8
-        window 60
+creative.example.com {
+    import cloudns_dns
+    import security_headers
 
-        # Whitelist internal networks
-        whitelist {
-            10.0.0.0/8
-            172.16.0.0/12
-            192.168.0.0/16
-        }
+    # Block specific AI companies
+    defender block {
+        ranges openai deepseek
+        message "OpenAI and DeepSeek bots are not permitted."
+    }
 
-        # Enable auto-learning
-        auto_learn true
+    # Return garbage to GitHub Copilot
+    defender garbage {
+        ranges githubcopilot
+    }
 
-        # Distributed mode with Redis
-        distributed true
-        redis_addr {$REDIS_ADDR}
+    # Tarpit cloud providers
+    defender tarpit {
+        ranges aws gcloud azurepubliccloud
     }
 
     reverse_proxy http://localhost:8080
@@ -322,28 +366,44 @@ For maximum protection, combine multiple security features:
 ultra-secure.example.com {
     import cloudns_dns
     import security_headers_strict
-    import defender_strict
+    order altcha_verify before reverse_proxy
+
+    # Layer 1: Block AI training bots
+    import defender_block_ai
+
+    # Layer 2: Block malicious bots
     import bot_protection
     import exploit_protection
 
-    # ALTCHA on forms
-    import altcha_strict
-    handle /.well-known/altcha {
-        altcha_verify
-    }
+    # Layer 3: ALTCHA challenge endpoint
+    import altcha_challenge_strict
+    import altcha_challenge_page
 
-    # Protected form submissions with rate limiting
+    # Layer 4: ALTCHA verification on forms
     @forms {
         path /contact /register /reset-password
         method POST
     }
 
-    handle @forms {
+    altcha_verify @forms {
+        hmac_key {env.ALTCHA_HMAC_KEY}
+        session_backend redis://localhost:6379/0
+        challenge_redirect /captcha
+        preserve_post_data true
+    }
+
+    # Layer 5: Rate limiting on form submissions
+    @forms_rate {
+        path /contact /register /reset-password
+        method POST
+    }
+
+    handle @forms_rate {
         import rate_limit_forms
         reverse_proxy http://localhost:8080
     }
 
-    # Regular traffic with general rate limiting
+    # Layer 6: General rate limiting
     import rate_limit_general
     reverse_proxy http://localhost:8080
 }
@@ -399,17 +459,20 @@ your-domain.com {
 
 #### ALTCHA (Spam Protection)
 
-- `altcha_basic` - Basic ALTCHA protection
-- `altcha_strict` - Strict ALTCHA for sensitive forms
-- `altcha_lenient` - Lenient ALTCHA for casual forms
-- `altcha_verify_endpoint` - ALTCHA verification endpoint handler
+- `altcha_challenge_basic` - Basic challenge endpoint (100k max_number, ~20ms)
+- `altcha_challenge_strict` - Strict challenge endpoint (1M max_number, ~200ms)
+- `altcha_challenge_page` - Serves ALTCHA widget HTML at /captcha
+- `altcha_verify_memory` - Verification with memory:// session backend
+- `altcha_verify_redis` - Verification with Redis session backend
 
-#### Caddy-Defender Snippets
+#### Caddy-Defender
 
-- `defender_basic` - Basic threat detection
-- `defender_strict` - Strict security with auto-blacklist (no default whitelist)
-- `defender_lenient` - Lenient mode (logging only)
-- `defender_challenge` - Challenge suspicious users
+- `defender_block_ai` - Block all AI bots with 403
+- `defender_block_all_ai` - Same as defender_block_ai (explicit ranges)
+- `defender_garbage_ai` - Return garbage data to poison AI training
+- `defender_redirect_ai` - Redirect AI bots to /ai-bot-notice
+- `defender_tarpit_ai` - Slow down AI bot requests
+- `defender_drop_ai` - Silently drop AI bot connections
 
 #### Redirects
 

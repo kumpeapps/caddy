@@ -1,13 +1,14 @@
-FROM caddy:builder AS builder
+FROM caddy:2.11.2-builder AS builder
 # Plugin versions pinned for reproducibility
 # Update these periodically to get security fixes and new features
+# Versions last checked: March 11, 2026
 RUN xcaddy build \
-    --with github.com/caddy-dns/cloudns@v0.0.6 \
-    --with github.com/mholt/caddy-ratelimit@v1.10.2 \
-    --with github.com/altcha-org/caddy-altcha@latest \
-    --with github.com/hlts2/caddy-defender@latest
+    --with github.com/caddy-dns/cloudns@v1.1.0 \
+    --with github.com/mholt/caddy-ratelimit@v0.1.0 \
+    --with github.com/stardothosting/caddy-altcha@e4f123b \
+    --with pkg.jsn.cam/caddy-defender=github.com/JasonLovesDoggo/caddy-defender@v0.10.0
 
-FROM caddy:latest
+FROM caddy:2.11.2
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 RUN mkdir -p /sites /usr/local/share/caddy
 COPY Caddyfile /etc/caddy/Caddyfile

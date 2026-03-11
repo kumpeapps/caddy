@@ -1,0 +1,304 @@
+# Copy this file to /sites/<name>.caddy and customize for your needs.
+# This example demonstrates ALTCHA integration for CAPTCHA-free spam protection.
+
+# ALTCHA provides a privacy-friendly alternative to traditional CAPTCHAs
+# using cryptographic challenges instead of image recognition.
+
+# Basic ALTCHA Configuration
+(altcha_basic) {
+    altcha {
+        # Secret key for HMAC signing (REQUIRED - generate a strong random key)
+        # Keep this secret and never expose it publicly
+        # Generate with: openssl rand -hex 32
+        # If not set, Caddy will fail to start - ensure ALTCHA_HMAC_KEY is defined
+        hmac_key {$ALTCHA_HMAC_KEY}
+
+        # Challenge expiration time (default: 120 seconds)
+        expires 120
+
+        # Maximum number of hashes to compute (default: 50000)
+        max_number 50000
+
+        # Verification endpoint (default: /.well-known/altcha)
+        verify_url "/.well-known/altcha"
+    }
+}
+
+# Strict ALTCHA Configuration (for high-security forms)
+(altcha_strict) {
+    altcha {
+        hmac_key {$ALTCHA_HMAC_KEY}
+
+        # Shorter expiration for sensitive forms
+        expires 60
+
+        # Higher difficulty for attackers
+        max_number 100000
+
+        # Require verification
+        verify_url "/.well-known/altcha"
+
+        # Add salt for extra security
+        auto_salt true
+    }
+}
+
+# Lenient ALTCHA Configuration (for casual forms)
+(altcha_lenient) {
+    altcha {
+        hmac_key {$ALTCHA_HMAC_KEY}
+
+        # Longer expiration for slow users
+        expires 300
+
+        # Lower difficulty
+        max_number 25000
+
+        verify_url "/.well-known/altcha"
+    }
+}
+
+# Example 1: Basic form protection with ALTCHA
+form.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Import ALTCHA protection
+    import altcha_basic
+
+    # Serve verification endpoint
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+
+    # Protected form endpoint
+    @form_submit {
+        path /submit
+        method POST
+    }
+
+    handle @form_submit {
+        # ALTCHA will verify the challenge before allowing through
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Regular pages don't need ALTCHA
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 2: Contact form with strict ALTCHA
+contact.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Use strict ALTCHA for contact forms
+    import altcha_strict
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # ALTCHA verification endpoint
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+
+    # Contact form submission
+    @contact_submit {
+        path /contact/submit
+        method POST
+    }
+
+    handle @contact_submit {
+        # Rate limit combined with ALTCHA
+        rate_limit {
+            zone contact {
+                key {remote_host}
+                events 5
+                window 5m
+            }
+        }
+        rate_limit contact
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 3: Multi-page site with ALTCHA on specific forms
+app.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # ALTCHA verification endpoint
+    import altcha_basic
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+
+    # Protect registration
+    @registration {
+        path /register /signup
+        method POST
+    }
+
+    handle @registration {
+        import altcha_strict
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Protect password reset
+    @password_reset {
+        path /reset-password
+        method POST
+    }
+
+    handle @password_reset {
+        import altcha_strict
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Protect comments/feedback with lenient ALTCHA
+    @comments {
+        path /comments /feedback
+        method POST
+    }
+
+    handle @comments {
+        import altcha_lenient
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Regular traffic
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 4: API with ALTCHA for specific endpoints
+api.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    import altcha_basic
+
+    # ALTCHA verification
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+
+    # Public API endpoints protected by ALTCHA
+    @public_api {
+        path /api/public/*
+        method POST PUT DELETE
+    }
+
+    handle @public_api {
+        # Combine ALTCHA with rate limiting
+        rate_limit {
+            zone public_api {
+                key {remote_host}
+                events 50
+                window 1m
+            }
+        }
+        rate_limit public_api
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    # Authenticated endpoints don't need ALTCHA
+    @auth_api {
+        path /api/v1/*
+        header Authorization *
+    }
+
+    handle @auth_api {
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    # Default handler
+    respond "Not Found" 404
+}
+
+# Example 5: E-commerce with ALTCHA on checkout
+shop.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    import altcha_strict
+
+    # ALTCHA verification
+    handle /.well-known/altcha {
+        altcha_verify
+    }
+
+    # Extra protection on checkout
+    @checkout {
+        path /checkout /payment
+        method POST
+    }
+
+    handle @checkout {
+        # Strict rate limiting + ALTCHA
+        rate_limit {
+            zone checkout {
+                key {remote_host}
+                events 10
+                window 5m
+            }
+        }
+        rate_limit checkout
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Cart operations with lenient ALTCHA
+    @cart {
+        path /cart/*
+        method POST PUT DELETE
+    }
+
+    handle @cart {
+        import altcha_lenient
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Browse products freely
+    reverse_proxy http://127.0.0.1:8080
+}

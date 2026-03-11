@@ -1,0 +1,530 @@
+# Copy this file to /sites/<name>.caddy and customize for your needs.
+# This example demonstrates Caddy-Defender integration for advanced security.
+
+# Caddy-Defender provides:
+# - IP blacklisting/whitelisting
+# - Automatic threat detection
+# - Request pattern analysis
+# - Advanced rate limiting with custom rules
+# - Real-time attack mitigation
+
+# Basic Defender Configuration
+(defender_basic) {
+    defender {
+        # Enable defender module
+        enable true
+
+        # Action to take when threat is detected
+        # Options: block, log, challenge
+        action block
+
+        # Block duration for detected threats (in seconds)
+        block_duration 3600
+
+        # Threshold for suspicious activity
+        threshold 10
+
+        # Time window for threshold calculation (in seconds)
+        window 60
+    }
+}
+
+# Strict Defender Configuration (for high-security sites)
+(defender_strict) {
+    defender {
+        enable true
+        action block
+
+        # Longer block duration
+        block_duration 86400
+
+        # Lower threshold (more sensitive)
+        threshold 5
+        window 60
+
+        # Enable automatic blacklisting
+        auto_blacklist true
+    }
+}
+
+# NOTE: defender_strict no longer includes a default RFC1918 whitelist for security.
+# If you need to whitelist private networks, define them explicitly as shown in Example 2b.
+
+# Lenient Defender Configuration (for development/testing)
+(defender_lenient) {
+    defender {
+        enable true
+
+        # Log instead of block during development
+        action log
+
+        threshold 50
+        window 60
+    }
+}
+
+# Challenge Mode (CAPTCHA-like behavior)
+(defender_challenge) {
+    defender {
+        enable true
+
+        # Challenge suspicious users instead of blocking
+        action challenge
+
+        block_duration 1800
+        threshold 15
+        window 60
+
+        # Challenge settings
+        challenge_timeout 300
+        challenge_max_attempts 3
+    }
+}
+
+# Example 1: Basic API protection with Defender
+api-protected.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Apply basic defender protection
+    import defender_basic
+
+    # API endpoints
+    @api path /api/*
+
+    handle @api {
+        # Combine with rate limiting
+        rate_limit {
+            zone api {
+                key {remote_host}
+                events 100
+                window 1m
+            }
+        }
+        rate_limit api
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 2: Admin panel with strict protection
+admin.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Strict defender for admin area
+    import defender_strict
+
+    # Additional security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    }
+
+    # Login attempts protection
+    @login path /login /auth/*
+
+    handle @login {
+        # Very strict rate limiting on login
+        rate_limit {
+            zone login {
+                key {remote_host}
+                events 3
+                window 10m
+            }
+        }
+        rate_limit login
+        reverse_proxy http://127.0.0.1:9000
+    }
+
+    reverse_proxy http://127.0.0.1:9000
+}
+
+# Example 2b: Internal admin with private network whitelist (if needed)
+# Use this pattern ONLY if you trust all traffic from RFC1918 networks
+internal-admin.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Strict defender with explicit private network whitelist
+    # Start with defender_strict, then add custom whitelist
+    defender {
+        enable true
+        action block
+        block_duration 86400
+        threshold 5
+        window 60
+        auto_blacklist true
+
+        # Explicitly whitelist RFC1918 networks
+        # ONLY use this if you genuinely trust ALL internal network traffic
+        # This whitelists: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+        whitelist {
+            10.0.0.0/8
+            172.16.0.0/12
+            192.168.0.0/16
+        }
+    }
+
+    # Additional security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+
+    reverse_proxy http://127.0.0.1:9000
+}
+
+# Example 3: Public site with challenge mode
+public.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Challenge suspicious traffic
+    import defender_challenge
+
+    # Allow search engine bots
+    @good_bots {
+        header User-Agent *Googlebot*
+        header User-Agent *bingbot*
+        header User-Agent *DuckDuckBot*
+        header User-Agent *Slackbot*
+    }
+
+    handle @good_bots {
+        # Skip defender for known good bots
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Regular traffic gets defender protection
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 4: E-commerce with layered protection
+shop-secure.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Defender configuration with custom rules
+    defender {
+        enable true
+        action block
+        block_duration 7200
+        threshold 20
+        window 60
+
+        # Whitelist your office/VPN IPs
+        whitelist {
+            # Example IPs - replace with your actual IPs
+            # 203.0.113.0/24
+        }
+
+        # Blacklist known bad actors
+        blacklist {
+            # Example - replace with actual bad IPs
+            # 198.51.100.0/24
+        }
+
+        # Enable GeoIP blocking (if configured)
+        # block_countries CN RU
+    }
+
+    # Checkout protection
+    @checkout path /checkout* /payment* /order*
+
+    handle @checkout {
+        # Extra strict for payment processing
+        rate_limit {
+            zone checkout {
+                key {remote_host}
+                events 5
+                window 5m
+            }
+        }
+        rate_limit checkout
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Product browsing
+    @products path /products* /category* /search*
+
+    handle @products {
+        rate_limit {
+            zone products {
+                key {remote_host}
+                events 200
+                window 1m
+            }
+        }
+        rate_limit products
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Cart operations
+    @cart path /cart*
+
+    handle @cart {
+        rate_limit {
+            zone cart {
+                key {remote_host}
+                events 50
+                window 1m
+            }
+        }
+        rate_limit cart
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 5: Combined Defender + Bot Protection
+comprehensive.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Defender protection
+    import defender_basic
+
+    # Block bad bots
+    @bad_bots {
+        header User-Agent *bot*
+        header User-Agent *spider*
+        header User-Agent *crawler*
+        header User-Agent *AhrefsBot*
+        header User-Agent *MJ12bot*
+        header User-Agent *SemrushBot*
+        header User-Agent *DotBot*
+        header User-Agent *PetalBot*
+    }
+
+    # Allow good bots
+    @good_bots {
+        header User-Agent *Googlebot*
+        header User-Agent *bingbot*
+        header User-Agent *DuckDuckBot*
+        header User-Agent *Slackbot*
+    }
+
+    # Block bad bots
+    handle @bad_bots {
+        respond "Forbidden" 403
+    }
+
+    # Block common exploit paths
+    @exploit_paths {
+        path *.php
+        path *.asp
+        path *.aspx
+        path *wp-admin*
+        path *wp-login*
+        path *.env*
+        path *.git*
+    }
+
+    handle @exploit_paths {
+        respond "Not Found" 404
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+
+    # Allow good bots without rate limiting
+    handle @good_bots {
+        reverse_proxy http://127.0.0.1:8080
+    }
+
+    # Rate limit regular traffic
+    rate_limit {
+        zone general {
+            key {remote_host}
+            events 300
+            window 1m
+        }
+    }
+    rate_limit general
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 6: Development mode with logging only
+dev.example.com {
+    tls internal
+
+    # Lenient defender for development
+    import defender_lenient
+
+    # Enable detailed logging
+    log {
+        output file /var/log/caddy/dev-access.log
+        format json
+        level DEBUG
+    }
+
+    reverse_proxy http://127.0.0.1:8080
+}
+
+# Example 7: Multi-tier protection
+enterprise.example.com {
+    tls {
+        dns cloudns {
+            auth_id {$CLOUDNS_AUTH_ID}
+            auth_password {$CLOUDNS_AUTH_PASSWORD}
+        }
+        propagation_delay 2m
+        propagation_timeout -1
+        resolvers 1.1.1.1 8.8.8.8
+    }
+
+    # Custom defender with advanced settings
+    defender {
+        enable true
+        action block
+        block_duration 21600  # 6 hours
+        threshold 8
+        window 60
+
+        # SECURITY WARNING: Whitelist internal networks only if you trust all traffic from them
+        # Untrusted clients on VPN/overlay networks will bypass protection
+        # Consider using defender_private_network_whitelist snippet or defining specific IPs
+        whitelist {
+            10.0.0.0/8
+            172.16.0.0/12
+            192.168.0.0/16
+        }
+
+        # Enable auto-learning (adapts to traffic patterns)
+        auto_learn true
+
+        # Store blocked IPs to database/file for persistence
+        persistence true
+        storage_path /data/defender
+
+        # Enable distributed mode for multi-instance deployments
+        distributed true
+        redis_addr {$REDIS_ADDR}
+    }
+
+    # Public API with defender
+    @public_api path /api/public/*
+
+    handle @public_api {
+        rate_limit {
+            zone public_api {
+                key {remote_host}
+                events 50
+                window 1m
+            }
+        }
+        rate_limit public_api
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    # Private API requires auth + defender
+    @private_api {
+        path /api/v1/*
+        header Authorization *
+    }
+
+    handle @private_api {
+        rate_limit {
+            zone private_api {
+                key {header.Authorization}
+                events 200
+                window 1m
+            }
+        }
+        rate_limit private_api
+        reverse_proxy http://127.0.0.1:3000
+    }
+
+    # Admin area with max protection
+    @admin path /admin/*
+
+    handle @admin {
+        # IP whitelist for admin (only allow specific IPs)
+        @allowed_admin {
+            remote_ip 203.0.113.0/24
+        }
+
+        handle @allowed_admin {
+            rate_limit {
+                zone admin {
+                    key {remote_host}
+                    events 50
+                    window 1m
+                }
+            }
+            rate_limit admin
+            reverse_proxy http://127.0.0.1:9000
+        }
+
+        handle {
+            respond "Forbidden" 403
+        }
+    }
+
+    # Default
+    rate_limit {
+        zone general {
+            key {remote_host}
+            events 300
+            window 1m
+        }
+    }
+    rate_limit general
+    reverse_proxy http://127.0.0.1:8080
+}

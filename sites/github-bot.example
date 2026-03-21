@@ -1,0 +1,195 @@
+# GitHub Bot Application Example Configuration
+# This example demonstrates a secure setup for a GitHub bot application
+# with webhook endpoints and an admin panel.
+#
+# Features:
+# - Secure webhook endpoint for GitHub events
+# - Protected admin panel with rate limiting
+# - Security headers and bot protection
+# - Separate logging for webhooks and admin access
+# - Public status/health check endpoint
+#
+# To use this configuration:
+# 1. Copy this file and remove the .example extension
+# 2. Update the domain name and backend port
+# 3. Optionally enable basic auth for admin panel
+# 4. Configure your GitHub webhook to use https://your-domain.com/webhook
+# 5. Set webhook secret in your application for signature verification
+
+# Import shared snippets
+import /sites/_snippets.inc
+
+# Main bot domain
+bot.example.com {
+    # Apply base GitHub bot security configuration
+    import github_bot
+
+    # Enable compression for better performance
+    encode gzip zstd
+
+    # =========================================================================
+    # WEBHOOK ENDPOINT
+    # =========================================================================
+    # This endpoint receives events from GitHub webhooks
+    # Rate limits are lenient for GitHub's User-Agent but strict for others
+
+    handle /webhook {
+        import github_bot_webhook_handler
+
+        # Only allow POST requests for webhooks
+        @webhook_post {
+            method POST
+        }
+
+        @not_post {
+            not method POST
+        }
+
+        handle @not_post {
+            respond "Method Not Allowed - Webhooks must use POST" 405
+        }
+
+        handle @webhook_post {
+            # Proxy to your bot application
+            # Your app should verify the X-Hub-Signature-256 header
+            reverse_proxy localhost:3000 {
+                # Pass webhook-specific headers
+                header_up X-Webhook-Endpoint "true"
+            }
+        }
+    }
+
+    # Alternative path for webhooks (some setups use /webhooks plural)
+    handle /webhooks/* {
+        import github_bot_webhook_handler
+        reverse_proxy localhost:3000
+    }
+
+    # =========================================================================
+    # ADMIN PANEL
+    # =========================================================================
+    # Protected admin interface with strict rate limiting and security
+
+    handle /admin* {
+        import github_bot_admin_handler
+
+        # Optional: Enable basic authentication
+        # Uncomment the following line and configure credentials
+        # import github_bot_admin_basic_auth
+
+        # Proxy to your bot application's admin interface
+        reverse_proxy localhost:3000 {
+            # Pass admin-specific headers
+            header_up X-Admin-Panel "true"
+        }
+    }
+
+    # =========================================================================
+    # PUBLIC API ENDPOINTS
+    # =========================================================================
+    # Public status page or API endpoints
+
+    handle /api/* {
+        # API rate limiting (moderate)
+        rate_limit {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+
+        # API-friendly headers
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, OPTIONS"
+            Access-Control-Allow-Headers "Content-Type, Authorization"
+        }
+
+        # Handle CORS preflight
+        @options {
+            method OPTIONS
+        }
+
+        handle @options {
+            respond "" 204
+        }
+
+        reverse_proxy localhost:3000
+    }
+
+    # Health check endpoint (no rate limiting)
+    handle /health {
+        reverse_proxy localhost:3000
+    }
+
+    # Status page (lenient rate limiting)
+    handle /status {
+        rate_limit {
+            key {remote_host}
+            events 60
+            window 1m
+        }
+
+        reverse_proxy localhost:3000
+    }
+
+    # =========================================================================
+    # DEFAULT / ROOT
+    # =========================================================================
+    # Landing page or documentation
+
+    handle {
+        # Moderate rate limiting for general traffic
+        rate_limit {
+            key {remote_host}
+            events 200
+            window 1m
+        }
+
+        reverse_proxy localhost:3000
+    }
+}
+
+# Alternative configuration: Bot with separate admin subdomain
+# Uncomment if you prefer admin.bot.example.com instead of bot.example.com/admin
+
+# admin.bot.example.com {
+#     import github_bot
+#     import github_bot_admin_handler
+#
+#     # Optional: Restrict admin subdomain to specific IPs
+#     @allowed_ips {
+#         remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+#     }
+#
+#     @not_allowed {
+#         not remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+#     }
+#
+#     handle @not_allowed {
+#         respond "Forbidden - Admin access restricted" 403
+#     }
+#
+#     handle {
+#         reverse_proxy localhost:3000
+#     }
+# }
+
+# Alternative configuration: Multiple webhook endpoints for different repos
+# bot.example.com {
+#     import github_bot
+#
+#     handle /webhook/repo1 {
+#         import github_bot_webhook_handler
+#         reverse_proxy localhost:3001
+#     }
+#
+#     handle /webhook/repo2 {
+#         import github_bot_webhook_handler
+#         reverse_proxy localhost:3002
+#     }
+#
+#     handle /admin* {
+#         import github_bot_admin_handler
+#         reverse_proxy localhost:3000
+#     }
+# }

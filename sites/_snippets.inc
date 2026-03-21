@@ -386,7 +386,7 @@
 # (basic_auth_admin) {
 #     basicauth {
 #         # Generate with: caddy hash-password
-#         # admin $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG
+#         # username <PASTE_BCRYPT_HASH_HERE>
 #     }
 # }
 
@@ -504,3 +504,271 @@
         ranges openai deepseek githubcopilot
     }
 }
+
+# =============================================================================
+# GITHUB BOT/WEBHOOK INTEGRATION
+# =============================================================================
+# Secure configuration for GitHub bot applications with webhook endpoints
+# and admin panel access. Includes security headers, rate limiting, and
+# GitHub webhook authentication.
+#
+# SECURITY NOTES:
+# 1. Webhook verification: This snippet identifies GitHub webhooks via User-Agent.
+#    For stronger security, also verify the X-Hub-Signature-256 header in your
+#    application and/or use the IP whitelist snippet (github_bot_webhook_ip_whitelist)
+#    See: https://docs.github.com/webhooks/using-webhooks/validating-webhook-deliveries
+#
+# 2. Exploit paths: The @exploit_paths matcher blocks common attack vectors.
+#    Review and customize this list for your specific application needs to avoid
+#    blocking legitimate files.
+#
+# 3. Admin authentication: The @no_auth matcher provides basic edge protection.
+#    All actual authentication and authorization MUST be handled by your upstream
+#    application. This is not a substitute for proper application-level auth.
+#
+# Usage example:
+#   example.com {
+#       import github_bot
+#
+#       # Webhook endpoint (bypasses strict rate limits)
+#       handle /webhook/* {
+#           import github_bot_webhook_handler
+#           reverse_proxy localhost:3000
+#       }
+#
+#       # Admin panel (strict rate limits + auth)
+#       handle /admin/* {
+#           import github_bot_admin_handler
+#           reverse_proxy localhost:3000
+#       }
+#
+#       # Public API or status page
+#       handle /* {
+#           reverse_proxy localhost:3000
+#       }
+#   }
+
+# Base GitHub bot configuration - apply to entire site
+(github_bot) {
+    # Security headers - relaxed for webhooks but still secure
+    header {
+        # Enable HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Remove server identification
+        -Server
+        -X-Powered-By
+    }
+
+    # Block known bad bots (but allow GitHub)
+    @bad_bots {
+        header User-Agent *AhrefsBot*
+        header User-Agent *MJ12bot*
+        header User-Agent *SemrushBot*
+        header User-Agent *DotBot*
+        header User-Agent *PetalBot*
+        header User-Agent *BLEXBot*
+        header User-Agent *Baiduspider*
+        header User-Agent *YandexBot*
+    }
+
+    handle @bad_bots {
+        abort
+    }
+
+    # Block common exploit attempts (but allow legitimate paths)
+    @exploit_paths {
+        path *.php
+        path *.asp
+        path *.aspx
+        path *.jsp
+        path *wp-admin*
+        path *wp-login*
+        path *phpmyadmin*
+        path *.env*
+        path *.git*
+        path *.sql
+        path *phpinfo*
+        path */login.php*
+    }
+
+    handle @exploit_paths {
+        respond "Not Found" 404
+    }
+
+    # General rate limiting for all requests
+    @not_webhook {
+        not path /webhook/*
+        not path /webhooks/*
+    }
+
+    rate_limit @not_webhook {
+        key {remote_host}
+        events 300
+        window 1m
+    }
+}
+
+# GitHub webhook endpoint handler - lenient rate limits for GitHub's IPs
+(github_bot_webhook_handler) {
+    # Match GitHub webhook requests by User-Agent
+    # GitHub webhooks identify as "GitHub-Hookshot/*"
+    @github_webhook {
+        header User-Agent *GitHub-Hookshot*
+    }
+
+    # Lenient rate limit for GitHub webhooks (200 events per minute)
+    # GitHub may send bursts of webhooks for repository events
+    rate_limit @github_webhook {
+        key {remote_host}
+        events 200
+        window 1m
+    }
+
+    # Stricter rate limit for non-GitHub requests to webhook endpoint
+    # This catches potential abuse while allowing GitHub through
+    @not_github {
+        not header User-Agent *GitHub-Hookshot*
+    }
+
+    rate_limit @not_github {
+        key {remote_host}
+        events 10
+        window 1m
+    }
+
+    # Set reverse proxy headers for webhook processing
+    header_up X-Real-IP {remote_host}
+    # Preserve existing proxy chain while appending the current remote host
+    header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-Host {host}
+
+    # Log webhook requests for debugging
+    log {
+        output file /var/log/caddy/github_webhook.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 168h
+        }
+        format json
+    }
+}
+
+# Admin panel handler - strict security and authentication
+(github_bot_admin_handler) {
+    # Strict security headers for admin panel
+    header {
+        # Stricter X-Frame-Options for admin
+        X-Frame-Options "DENY"
+
+        # Stricter Referrer Policy
+        Referrer-Policy "no-referrer"
+
+        # Content Security Policy for admin panel (strict - no unsafe-inline)
+        # If your admin panel uses inline scripts/styles, you must either:
+        # 1. Move them to external files, OR
+        # 2. Implement CSP nonces/hashes in your application
+        # See: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+
+        # Additional permissions restrictions
+        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    }
+
+    # Very strict rate limiting for admin panel
+    rate_limit {
+        key {remote_host}
+        events 50
+        window 1m
+    }
+
+    # Additional rate limiting for admin login attempts
+    @admin_login {
+        path /admin/login*
+        method POST
+    }
+
+    rate_limit @admin_login {
+        key {remote_host}
+        events 5
+        window 5m
+    }
+
+# Basic edge protection: block requests without auth headers
+    # NOTE: This only checks for PRESENCE of auth headers, not validity.
+    # All actual authentication and authorization MUST be implemented in
+    # your upstream application. This is a first-line defense, not a
+    # complete auth solution.
+    @no_auth {
+        not header Authorization *
+        not header Cookie *
+        path /admin/*
+        not path /admin/login*
+    }
+
+    handle @no_auth {
+        respond "Unauthorized" 401 {
+            header WWW-Authenticate "Bearer realm=\"Admin Panel\""
+        }
+    }
+
+    # Set reverse proxy headers
+    header_up X-Real-IP {remote_host}
+    # Preserve existing proxy chain while appending the current remote host
+    header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-Host {host}
+
+    # Log admin access for security auditing
+    log {
+        output file /var/log/caddy/github_admin.log {
+            roll_size 50mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+        format json
+        level INFO
+    }
+}
+
+# Optional: GitHub webhook IP whitelist (RECOMMENDED for added security)
+# GitHub maintains a list of webhook source IPs that can be fetched via:
+# https://api.github.com/meta (look for the "hooks" array)
+#
+# SECURITY BEST PRACTICE: Use this IP whitelist IN ADDITION TO verifying
+# the X-Hub-Signature-256 header in your application for defense-in-depth.
+# User-Agent matching alone is easily spoofed.
+#
+# Update these IP ranges periodically as GitHub may change them.
+# Last updated: 2026-03 (example ranges - verify current ranges via API)
+#
+# Usage: Add "import github_bot_webhook_ip_whitelist" in your webhook handler
+#
+# (github_bot_webhook_ip_whitelist) {
+#     @github_ips {
+#         remote_ip 140.82.112.0/20 143.55.64.0/20 185.199.108.0/22 192.30.252.0/22
+#     }
+#
+#     @not_github_ip {
+#         not remote_ip 140.82.112.0/20 143.55.64.0/20 185.199.108.0/22 192.30.252.0/22
+#     }
+#
+#     handle @not_github_ip {
+#         respond "Forbidden - Invalid source IP" 403
+#     }
+# }
+
+# Optional: Basic auth for admin panel (uncomment and customize)
+# Generate password hash with: caddy hash-password
+# (github_bot_admin_basic_auth) {
+#     basicauth /admin/* {
+#         # username <PASTE_BCRYPT_HASH_HERE>
+#     }
+# }

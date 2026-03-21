@@ -512,6 +512,13 @@
 # and admin panel access. Includes security headers, rate limiting, and
 # GitHub webhook authentication.
 #
+# DESIGN NOTES:
+# - These snippets focus on rate limiting, method checking, and security
+# - Logging should be configured at the site level (not in snippets)
+# - Caddy automatically passes X-Forwarded-* headers to upstream servers
+# - Additional header_up directives in reverse_proxy blocks are not needed
+#   unless you need to customize the default values
+#
 # SECURITY NOTES:
 # 1. Webhook verification: This snippet identifies GitHub webhooks via User-Agent.
 #    For stronger security, also verify the X-Hub-Signature-256 header in your
@@ -651,16 +658,6 @@
         events 10
         window 1m
     }
-
-    # Log webhook requests for debugging
-    log {
-        output file /var/log/caddy/github_webhook.log {
-            roll_size 50mb
-            roll_keep 5
-            roll_keep_for 168h
-        }
-        format json
-    }
 }
 
 # Admin panel handler - strict security and authentication
@@ -719,17 +716,6 @@
         respond "Unauthorized" 401 {
             header WWW-Authenticate "Bearer realm=\"Admin Panel\""
         }
-    }
-
-    # Log admin access for security auditing
-    log {
-        output file /var/log/caddy/github_admin.log {
-            roll_size 50mb
-            roll_keep 10
-            roll_keep_for 720h
-        }
-        format json
-        level INFO
     }
 }
 

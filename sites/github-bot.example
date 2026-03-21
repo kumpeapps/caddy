@@ -6,7 +6,6 @@
 # - Secure webhook endpoint for GitHub events
 # - Protected admin panel with rate limiting
 # - Security headers and bot protection
-# - Separate logging for webhooks and admin access
 # - Public status/health check endpoint
 #
 # To use this configuration:
@@ -15,6 +14,16 @@
 # 3. Optionally enable basic auth for admin panel
 # 4. Configure your GitHub webhook to use https://your-domain.com/webhook
 # 5. Set webhook secret in your application for signature verification
+#
+# Note: Caddy automatically passes X-Forwarded-For, X-Forwarded-Proto, and
+# X-Forwarded-Host headers to upstream servers. Additional header_up directives
+# are not needed unless you need to customize these values.
+#
+# Optional logging: To enable access logging, add this at the site level:
+#   log {
+#       output file /var/log/caddy/access.log
+#       format json
+#   }
 
 # Import shared snippets
 import /sites/_snippets.inc
@@ -38,24 +47,13 @@ bot.example.com {
 
         # Proxy to your bot application
         # Your app should verify the X-Hub-Signature-256 header
-        reverse_proxy localhost:3000 {
-            # Preserve proxy chain for security auditing
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy localhost:3000
     }
 
     # Alternative path for webhooks (some setups use /webhooks plural)
     handle /webhooks/* {
         import github_bot_webhook_handler
-        reverse_proxy localhost:3000 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-        }
+        reverse_proxy localhost:3000
     }
 
     # =========================================================================
@@ -71,15 +69,7 @@ bot.example.com {
         # import github_bot_admin_basic_auth
 
         # Proxy to your bot application's admin interface
-        reverse_proxy localhost:3000 {
-            # Preserve proxy chain for security auditing
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-            # Pass admin-specific headers
-            header_up X-Admin-Panel "true"
-        }
+        reverse_proxy localhost:3000
     }
 
     # =========================================================================

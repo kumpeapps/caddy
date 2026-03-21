@@ -713,9 +713,8 @@
     }
 
     handle @no_auth {
-        respond "Unauthorized" 401 {
-            header WWW-Authenticate "Bearer realm=\"Admin Panel\""
-        }
+        header WWW-Authenticate "Bearer realm=\"Admin Panel\""
+        respond "Unauthorized" 401
     }
 }
 

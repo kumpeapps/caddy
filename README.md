@@ -650,6 +650,292 @@ docker run --rm -v $PWD/sites:/sites caddy-custom caddy validate --config /etc/c
 docker run --rm -v $PWD/sites:/sites caddy-custom caddy fmt --overwrite /sites/yoursite.caddy
 ```
 
+## Safe Configuration Management
+
+Caddy validates all configuration files on startup. If any file has errors, Caddy will fail to start. This protects against misconfigurations but can be disruptive if you have multiple sites and one has an error.
+
+### Validation Scripts
+
+This repository includes helper scripts to validate configurations before reloading:
+
+#### validate-config.sh
+
+Validates all site configs individually and reports errors without making changes:
+
+```bash
+# Make the script executable
+chmod +x validate-config.sh
+
+# Validate all configurations
+./validate-config.sh
+
+# With custom paths (example)
+SITES_DIR=/sites \
+  MAIN_CADDYFILE=/etc/caddy/Caddyfile \
+  ./validate-config.sh
+```
+
+#### safe-reload.sh
+
+Validates configs, optionally backs up or deletes invalid ones, and reloads Caddy:
+
+```bash
+# Make the script executable
+chmod +x safe-reload.sh
+
+# Validate and prompt for action
+./safe-reload.sh
+
+# Automatically backup invalid configs and reload
+./safe-reload.sh --auto-backup
+
+# Automatically delete invalid configs and reload (no prompt)
+./safe-reload.sh --auto-delete
+
+# Delete invalid configs with confirmation prompt
+./safe-reload.sh --delete
+
+# Show help and all options
+./safe-reload.sh --help
+```
+
+**Features:**
+
+- ✅ Validates each site config individually
+- ✅ Identifies which configs have errors
+- ✅ Shows detailed error messages
+- ✅ Multiple handling modes: backup, delete with prompt, or auto-delete
+- ✅ Detects read-only mounts and adapts behavior
+- ✅ Optionally moves invalid configs to backup directory with timestamps
+- ✅ Optionally deletes invalid configs (with or without confirmation)
+- ✅ Only reloads Caddy if all remaining configs are valid
+- ✅ Keeps error logs alongside backups for troubleshooting
+
+**Handling Modes:**
+
+- **No flags** - Validates and reports errors, requires manual action
+- **`--auto-backup`** - Automatically moves invalid configs to timestamped backup directory (safest)
+- **`--delete`** - Deletes invalid configs after confirmation prompt
+- **`--auto-delete`** - Automatically deletes invalid configs without prompt (use with caution)
+
+**When to use each mode:**
+
+- Use **`--auto-backup`** (recommended) when:
+  - You want to keep invalid configs for reference
+  - You're still developing/testing configurations
+  - You need an audit trail of changes
+  - You want the safest option with easy rollback
+
+- Use **`--delete`** when:
+  - You want to remove invalid configs but verify first
+  - You're cleaning up old/unused configs
+  - You're confident in your validation but want one last check
+
+- Use **`--auto-delete`** when:
+  - You're in an automated CI/CD pipeline
+  - Invalid configs are definitely unwanted/obsolete
+  - You have version control backups
+  - You prioritize speed over safety (not recommended for production)
+
+### Best Practices for Configuration Management
+
+1. **Always Validate Before Deploying**
+
+   ```bash
+   # Test locally first
+   ./validate-config.sh
+
+   # Deploy only if validation passes
+   if ./validate-config.sh; then
+       docker-compose restart caddy
+   fi
+   ```
+
+2. **Use Version Control**
+
+   - Keep all configs in Git
+   - Test in a staging environment first
+   - Use pull requests for config changes
+
+3. **Gradual Rollout**
+
+   - Deploy one site config at a time
+   - Monitor logs after each deployment
+   - Keep backups of working configs
+
+4. **Naming Conventions**
+
+   - Use `.example` extension for templates (ignored by Caddy)
+   - Use descriptive names: `sitename.caddy` or `sitename.conf`
+   - Keep `_snippets.inc` and `_matchers.inc` for shared configs
+
+5. **Testing New Configs**
+
+   ```bash
+   # Create a test file
+   cp mysite.caddy mysite.caddy.example
+
+   # Edit and test
+   vim mysite.caddy.example
+   ./validate-config.sh
+
+   # When ready, activate it
+   mv mysite.caddy.example mysite.caddy
+   ./safe-reload.sh
+   ```
+
+6. **Automated Validation in CI/CD**
+
+   ```yaml
+   # Example GitHub Actions workflow
+   - name: Validate Caddy Configs
+     run: |
+       chmod +x validate-config.sh
+       ./validate-config.sh
+   ```
+
+### Handling Configuration Errors
+
+If Caddy fails to start due to configuration errors:
+
+1. **Check the logs** for specific error messages
+2. **Use validate-config.sh** to identify which file has errors
+3. **Fix the error** or move the file to `.example` extension
+4. **Validate again** before restarting Caddy
+
+**Pro Tip:** Set up a cron job to automatically validate configs:
+
+```bash
+# Add to crontab to validate configs daily
+0 2 * * * /path/to/validate-config.sh && echo "Configs valid" || echo "Config errors detected!" | mail -s "Caddy Config Alert" admin@example.com
+```
+
+### Working with Read-Only Mounts
+
+When using Docker with read-only volume mounts (`:ro`), the validation scripts detect this and adapt their behavior:
+
+**Validation Script** (`validate-config.sh`)
+
+- ✅ Works perfectly with read-only mounts
+- Reports errors without attempting to modify files
+- Provides guidance on fixing issues at the source
+
+**Safe Reload Script** (`safe-reload.sh`)
+
+- ✅ Detects read-only mounts automatically
+- ❌ Cannot use `--auto-backup`, `--delete`, or `--auto-delete` flags (require write access)
+- Provides clear error messages and remediation steps
+
+#### Recommended Workflow for Read-Only Mounts
+
+1. **Development/Testing:**
+
+   ```bash
+   # On your development machine (with write access)
+   vim sites/mysite.caddy
+   ./validate-config.sh
+
+   # Fix any errors before committing
+   git add sites/mysite.caddy
+   git commit -m "Update site config"
+   git push
+   ```
+
+2. **Production Deployment:**
+
+   ```bash
+   # Pull latest configs
+   git pull
+
+   # Validate before deploying
+   ./validate-config.sh
+
+   # If validation passes, deploy
+   docker-compose up -d --force-recreate
+   ```
+
+3. **In Docker Compose:**
+
+   ```yaml
+   services:
+     caddy:
+       image: caddy-custom
+       volumes:
+         # Read-only mount prevents accidental modifications
+         - ./sites:/sites:ro
+         - caddy_data:/data
+         - caddy_config:/config
+   ```
+
+4. **Handling Errors with Read-Only Mounts:**
+
+   If `validate-config.sh` finds errors:
+
+   ```bash
+   # The script will output something like:
+   # "Sites directory is read-only. To fix:"
+   # "1. Fix the errors in your source repository"
+   # "2. Commit and push the changes"
+   # "3. Redeploy/remount the updated configs"
+
+   # Fix in your source
+   vim sites/problematic-site.caddy
+
+   # Validate locally
+   ./validate-config.sh
+
+   # Commit and deploy
+   git commit -am "Fix config errors"
+   git push
+
+   # On server: pull and restart
+   git pull && docker-compose restart caddy
+   ```
+
+5. **CI/CD Pipeline Integration:**
+
+   ```yaml
+   # .github/workflows/deploy-caddy.yml
+   name: Deploy Caddy Configs
+
+   on:
+     push:
+       branches: [main]
+       paths:
+         - 'sites/**'
+
+   jobs:
+     validate-and-deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+
+         - name: Validate Caddy Configs
+           run: |
+             chmod +x validate-config.sh
+             ./validate-config.sh
+
+         - name: Deploy to Production
+           if: success()
+           run: |
+             # Your deployment commands here
+             ssh production "cd /app && git pull && docker-compose restart caddy"
+   ```
+
+**Benefits of Read-Only Mounts:**
+
+- ✅ Prevents accidental modifications in production
+- ✅ Enforces GitOps workflow (all changes via source control)
+- ✅ Clear audit trail of all configuration changes
+- ✅ Easy rollback via Git
+- ✅ Consistency across environments
+
+**Trade-offs:**
+
+- ❌ Cannot use `--auto-backup`, `--delete`, or `--auto-delete` flags
+- ❌ Must fix errors at source and redeploy
+- ℹ️ Slightly longer feedback loop for config changes
+
 ## Security Best Practices
 
 1. **Always use HTTPS**: The setup automatically provisions SSL certificates

@@ -1,0 +1,59 @@
+# Gitleaks Configuration
+# Configuration file for gitleaks secret scanner to reduce false positives
+
+title = "Caddy Configuration Repository"
+
+[allowlist]
+  description = "Global allowlist for false positives"
+
+  # Ignore documentation files with example configurations
+  # Note: The bot normalizes paths to lowercase before matching
+  paths = [
+    '''readme\.md$''',
+    '''.*\.example$''',
+    '''\.gitleaks\.toml$''',
+    '''\.gitleaksignore$''',
+  ]
+
+  # Stop words - ignore these specific strings (normalized to lowercase by bot)
+  stopwords = [
+    "sites_dir",
+    "main_caddyfile",
+    "caddy_binary",
+    "backup_dir",
+    "/etc/caddy/caddyfile",
+    "/sites",
+    "validate-config",
+  ]
+
+  # Ignore common false positive patterns in documentation
+  regexes = [
+    # Example file paths and environment variables (allow any path-like strings)
+    '''(sites_dir|main_caddyfile|caddy_binary|backup_dir)=''',
+    '''=/etc/caddy/''',
+    '''=/sites''',
+    '''=/var/log/caddy/''',
+    '''\./validate-config\.sh''',
+    # Example domain names
+    '''example\.com''',
+    '''bot\.example\.com''',
+    '''localhost:[0-9]+''',
+    # chmod commands
+    '''chmod [+\-][rwx]+''',
+    # Git commit messages
+    '''commit -[am]''',
+    # bcrypt placeholder
+    '''<paste_bcrypt_hash_here>''',
+    # Base64 regex pattern in toml (the pattern itself, not actual secrets)
+    '''(?:[a-za-z0-9+/]{4})*(?:[a-za-z0-9+/]{2}==|[a-za-z0-9+/]{3}=)?''',
+  ]
+
+# Disable generic high-entropy detectors for documentation files
+[[rules]]
+  description = "Ignore generic secrets in documentation"
+  id = "generic-api-key"
+  [rules.allowlist]
+    paths = [
+      '''readme\.md$''',
+      '''.*\.example$''',
+    ]

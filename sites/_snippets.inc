@@ -652,13 +652,6 @@
         window 1m
     }
 
-    # Set reverse proxy headers for webhook processing
-    header_up X-Real-IP {remote_host}
-    # Preserve existing proxy chain while appending the current remote host
-    header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
-    header_up X-Forwarded-Proto {scheme}
-    header_up X-Forwarded-Host {host}
-
     # Log webhook requests for debugging
     log {
         output file /var/log/caddy/github_webhook.log {
@@ -727,13 +720,6 @@
             header WWW-Authenticate "Bearer realm=\"Admin Panel\""
         }
     }
-
-    # Set reverse proxy headers
-    header_up X-Real-IP {remote_host}
-    # Preserve existing proxy chain while appending the current remote host
-    header_up X-Forwarded-For {remote_host}, {header.X-Forwarded-For}
-    header_up X-Forwarded-Proto {scheme}
-    header_up X-Forwarded-Host {host}
 
     # Log admin access for security auditing
     log {

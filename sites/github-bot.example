@@ -36,27 +36,9 @@ bot.example.com {
     handle /webhook {
         import github_bot_webhook_handler
 
-        # Only allow POST requests for webhooks
-        @webhook_post {
-            method POST
-        }
-
-        @not_post {
-            not method POST
-        }
-
-        handle @not_post {
-            respond "Method Not Allowed - Webhooks must use POST" 405
-        }
-
-        handle @webhook_post {
-            # Proxy to your bot application
-            # Your app should verify the X-Hub-Signature-256 header
-            reverse_proxy localhost:3000 {
-                # Pass webhook-specific headers
-                header_up X-Webhook-Endpoint "true"
-            }
-        }
+        # Proxy to your bot application
+        # Your app should verify the X-Hub-Signature-256 header
+        reverse_proxy localhost:3000
     }
 
     # Alternative path for webhooks (some setups use /webhooks plural)

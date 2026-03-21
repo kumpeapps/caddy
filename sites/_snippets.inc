@@ -617,6 +617,15 @@
 
 # GitHub webhook endpoint handler - lenient rate limits for GitHub's IPs
 (github_bot_webhook_handler) {
+    # Only allow POST requests (GitHub webhooks only use POST)
+    @not_post {
+        not method POST
+    }
+
+    handle @not_post {
+        respond "Method Not Allowed - Webhooks must use POST" 405
+    }
+
     # Match GitHub webhook requests by User-Agent
     # GitHub webhooks identify as "GitHub-Hookshot/*"
     @github_webhook {

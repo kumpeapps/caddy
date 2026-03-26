@@ -569,6 +569,10 @@ See [sites/example-with-snippets.caddy](sites/example-with-snippets.caddy) for c
 
 Professional, user-friendly error pages with modern responsive design similar to BunkerWeb.
 
+### Automatic Error Handling
+
+**Error pages are now enabled automatically!** The docker-entrypoint.sh automatically injects error handling into all site configurations at startup. No manual configuration needed.
+
 ### Available Error Pages
 
 - **404** - Page or domain not found (blue theme)
@@ -576,32 +580,40 @@ Professional, user-friendly error pages with modern responsive design similar to
 - **503** - Service Unavailable - maintenance/high load (pink theme)
 - **504** - Gateway Timeout - upstream timeout (orange theme)
 
-### Usage
+### How It Works
 
-Import error page snippets in your site configuration:
+1. **Unconfigured domains**: Automatically show 404 error page via `000-fallback.caddy`
+2. **Configured domains**: The entrypoint script automatically adds error handling to all `.caddy` files that don't already have it
+3. **Manual override**: Add your own `handle_errors` block or `import error_pages_*` to customize
+
+### Manual Configuration (Optional)
+
+If you want to customize error handling, you can manually import these snippets:
 
 ```caddyfile
 example.com {
-    # Show custom error pages for backend errors (recommended for reverse proxies)
+    # Option 1: All error codes (recommended)
+    import error_pages_all
+
+    # Option 2: Only backend errors (502, 503, 504)
     import error_pages_backend
 
+    # Option 3: Only 404 errors
+    import error_pages_404
+
+    # Your other configuration
     reverse_proxy localhost:8080
 }
 ```
 
-Available snippets:
+**Note:** If you add manual error handling, the automatic injection will be skipped for that file.
 
-- `error_pages_backend` - Handles 502, 503, 504 (backend/upstream errors)
-- `error_pages_404` - Handles 404 (page not found)
-- `error_pages_all` - Handles all common error codes (404, 502, 503, 504)
+### Disabling Automatic Injection
 
-### Unconfigured Domains
+The automatic error handling injection only works with writable /sites volumes. To disable:
 
-The setup includes a fallback handler (`000-fallback.caddy`) that automatically shows the 404 error page for any domain not explicitly configured in your Caddy setup.
-
-### Error Page Features
-
-- 📱 Fully responsive design
+1. Mount `/sites` as read-only (`:ro`)
+2. Or add `handle_errors` or `import.*error_pages` to your config (prevents injection)
 - 🎨 Modern gradient backgrounds (unique color for each error)
 - 💡 User-friendly guidance and troubleshooting tips
 - 🔄 "Try Again" button for easy refresh
@@ -810,27 +822,37 @@ chmod +x safe-reload.sh
 - ✅ Validates each site config individually
 - ✅ Identifies which configs have errors
 - ✅ Shows detailed error messages
-- ✅ Multiple handling modes: backup, delete with prompt, or auto-delete
+- ✅ **Smart default: Temporarily hides invalid configs during reload**
+- ✅ Multiple handling modes: temporary hide, backup, or delete
 - ✅ Detects read-only mounts and adapts behavior
 - ✅ Optionally moves invalid configs to backup directory with timestamps
 - ✅ Optionally deletes invalid configs (with or without confirmation)
-- ✅ Only reloads Caddy if all remaining configs are valid
+- ✅ Only reloads Caddy with valid configs
 - ✅ Keeps error logs alongside backups for troubleshooting
 
 **Handling Modes:**
 
-- **No flags** - Validates and reports errors, requires manual action
-- **`--auto-backup`** - Automatically moves invalid configs to timestamped backup directory (safest)
+- **No flags (Default - Recommended)** - Temporarily renames invalid configs to `.caddy.invalid` during reload, then restores them. This allows Caddy to reload with valid sites while preserving broken configs for you to fix later. **No data loss!**
+
+- **`--auto-backup`** - Permanently moves invalid configs to timestamped backup directory (safest for long-term storage)
+
 - **`--delete`** - Deletes invalid configs after confirmation prompt
+
 - **`--auto-delete`** - Automatically deletes invalid configs without prompt (use with caution)
 
 **When to use each mode:**
 
-- Use **`--auto-backup`** (recommended) when:
-  - You want to keep invalid configs for reference
+- Use **default (no flags)** (recommended) when:
+  - You have a mix of working and broken configs
+  - You want Caddy to keep running with valid sites
+  - You want to fix invalid configs without losing them
+  - You need Caddy to reload immediately without manual intervention
+
+- Use **`--auto-backup`** when:
+  - You want to archive old/invalid configs permanently
   - You're still developing/testing configurations
   - You need an audit trail of changes
-  - You want the safest option with easy rollback
+  - You want timestamped backups for historical reference
 
 - Use **`--delete`** when:
   - You want to remove invalid configs but verify first

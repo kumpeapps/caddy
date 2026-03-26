@@ -12,12 +12,14 @@ if [ -f "/.dockerenv" ] && [ -d "/sites" ]; then
     DEFAULT_BACKUP_DIR="/sites-backup"
     DEFAULT_CADDYFILE="/etc/caddy/Caddyfile"
     DEFAULT_SNIPPETS_DIR="/usr/local/share/caddy"
+    ADDITIONAL_SITES_DIRS="/home/kumpeapps-bot-deploy/caddy-sites"
 else
     # Running in dev container or locally
     DEFAULT_SITES_DIR="/workspaces/caddy/sites"
     DEFAULT_BACKUP_DIR="/workspaces/caddy/sites-backup"
     DEFAULT_CADDYFILE="/workspaces/caddy/Caddyfile"
     DEFAULT_SNIPPETS_DIR="/workspaces/caddy/sites"
+    ADDITIONAL_SITES_DIRS=""
 fi
 
 CADDY_BINARY="${CADDY_BINARY:-caddy}"
@@ -25,6 +27,8 @@ SITES_DIR="${SITES_DIR:-$DEFAULT_SITES_DIR}"
 BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
 MAIN_CADDYFILE="${MAIN_CADDYFILE:-$DEFAULT_CADDYFILE}"
 SNIPPETS_DIR="${SNIPPETS_DIR:-$DEFAULT_SNIPPETS_DIR}"
+# Space-separated list of additional directories to validate
+EXTRA_DIRS="${EXTRA_DIRS:-$ADDITIONAL_SITES_DIRS}"
 AUTO_BACKUP=false
 AUTO_DELETE=false
 DELETE_PROMPT=false
@@ -155,9 +159,23 @@ if ! "$CADDY_BINARY" validate --config "$MAIN_CADDYFILE" --adapter caddyfile 2>"
 fi
 echo -e "${GREEN}✓ Valid${NC}"
 
-# Validate individual site configs
-if [ ! -d "$SITES_DIR" ]; then
-    echo "Sites directory not found: $SITES_DIR"
+# Build array of directories to validate
+DIRS_TO_VALIDATE=()
+if [ -d "$SITES_DIR" ]; then
+    DIRS_TO_VALIDATE+=("$SITES_DIR")
+fi
+
+# Add additional directories if they exist
+if [ -n "$EXTRA_DIRS" ]; then
+    for dir in $EXTRA_DIRS; do
+        if [ -d "$dir" ]; then
+            DIRS_TO_VALIDATE+=("$dir")
+        fi
+    done
+fi
+
+if [ ${#DIRS_TO_VALIDATE[@]} -eq 0 ]; then
+    echo "No site directories found to validate."
     exit 0
 fi
 
@@ -168,26 +186,71 @@ echo "-----------------------------------"
 declare -a invalid_configs=()
 declare -a valid_configs=()
 
-while IFS= read -r -d '' config_file; do
-    # Skip example files and snippets
-    if [[ "$config_file" == *.example ]] || \
-       [[ "$config_file" == *_snippets.inc ]] || \
-       [[ "$config_file" == *_matchers.inc ]]; then
-        continue
-    fi
+for dir in "${DIRS_TO_VALIDATE[@]}"; do
+    echo ""
+    echo "Directory: $dir"
 
-    filename=$(basename "$config_file")
-    echo -n "  $filename... "
+    while IFS= read -r -d '' config_file; do
+        # Skip example files and snippets
+        if [[ "$config_file" == *.example ]] || \
+           [[ "$config_file" == *_snippets.inc ]] || \
+           [[ "$config_file" == *_matchers.inc ]]; then
+            continue
+        fi
 
-    # Create temporary test Caddyfile
+        filename=$(basename "$config_file")
+        echo -n "  $filename... "
+
+    # Copy snippet files to temp directory so relative imports work
+    cp "$SNIPPETS_DIR/_snippets.inc" "$TEMP_DIR/" 2>/dev/null || true
+    cp "$SNIPPETS_DIR/_matchers.inc" "$TEMP_DIR/" 2>/dev/null || true
+
+    # Copy the site config to temp directory (so imports are relative to same dir)
+    cp "$config_file" "$TEMP_DIR/"
+
+    # Create temporary test Caddyfile that imports everything
+    # Include auto_error_pages snippet definition from main Caddyfile
     cat > "$TEMP_DIR/test.Caddyfile" <<EOF
 {
     # Test validation
 }
 
-import $SNIPPETS_DIR/_snippets.inc
-import $SNIPPETS_DIR/_matchers.inc
-import $config_file
+# Auto error pages snippet (from main Caddyfile)
+(auto_error_pages) {
+    handle_errors {
+        @404 expression \{http.error.status_code} == 404
+        @502 expression \{http.error.status_code} == 502
+        @503 expression \{http.error.status_code} == 503
+        @504 expression \{http.error.status_code} == 504
+
+        handle @404 {
+            rewrite * /404.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @502 {
+            rewrite * /502.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @503 {
+            rewrite * /503.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @504 {
+            rewrite * /504.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
+}
+
+import _snippets.inc
+import $(basename "$config_file")
 EOF
 
     if "$CADDY_BINARY" validate --config "$TEMP_DIR/test.Caddyfile" --adapter caddyfile 2>"$TEMP_DIR/${filename}.error"; then
@@ -199,7 +262,8 @@ EOF
         # Store error for later display
         cp "$TEMP_DIR/${filename}.error" "$TEMP_DIR/${filename}.stored_error"
     fi
-done < <(find "$SITES_DIR" -maxdepth 1 -type f \( -name "*.caddy" -o -name "*.conf" \) -print0 2>/dev/null)
+    done < <(find "$dir" -maxdepth 1 -type f \( -name "*.caddy" -o -name "*.conf" \) -print0 2>/dev/null)
+done
 
 echo ""
 echo "=================================="

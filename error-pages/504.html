@@ -161,23 +161,24 @@
     <div class="container">
         <div class="error-icon">⏱️</div>
         <div class="error-code">504</div>
-        <h1>Gateway Timeout</h1>
-        <p>The server took too long to respond to your request.</p>
-        <p>The backend service is taking longer than expected to process your request.</p>
+        <h1>Application Timeout</h1>
+        <p>You've successfully reached the <strong>KumpeApps Deployment Server</strong>, but the requested application
+            took too long to respond.</p>
+        <p>This usually means the application is overloaded, performing a long operation, or has crashed.</p>
 
         <div class="info-box">
             <h2>What can you do?</h2>
             <ul>
-                <li>Wait a moment and try refreshing the page</li>
-                <li>The server might be experiencing high traffic</li>
-                <li>Try again in a few minutes</li>
+                <li>Wait a moment and try again</li>
+                <li>The application may be processing a heavy workload</li>
+                <li>Contact the application owner if timeouts continue</li>
             </ul>
         </div>
 
         <a href="javascript:window.location.reload();" class="button">Try Again</a>
 
         <div class="footer">
-            Powered by Caddy Web Server
+            Powered by KumpeApps LLC Deployment Server
         </div>
     </div>
 </body>

@@ -752,3 +752,83 @@
 #         # username <PASTE_BCRYPT_HASH_HERE>
 #     }
 # }
+
+# =============================================================================
+# ERROR PAGES
+# =============================================================================
+# Custom graphical error pages similar to BunkerWeb
+# These provide user-friendly error messages with modern, responsive design
+
+# Handle all backend communication errors (502, 503, 504)
+(error_pages_backend) {
+    handle_errors {
+        @502 expression {http.error.status_code} == 502
+        @503 expression {http.error.status_code} == 503
+        @504 expression {http.error.status_code} == 504
+
+        handle @502 {
+            rewrite * /502.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @503 {
+            rewrite * /503.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @504 {
+            rewrite * /504.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
+}
+
+# Handle 404 errors (page or domain not found)
+(error_pages_404) {
+    handle_errors {
+        @404 expression {http.error.status_code} == 404
+
+        handle @404 {
+            rewrite * /404.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
+}
+
+# Handle all common error codes
+(error_pages_all) {
+    handle_errors {
+        @404 expression {http.error.status_code} == 404
+        @502 expression {http.error.status_code} == 502
+        @503 expression {http.error.status_code} == 503
+        @504 expression {http.error.status_code} == 504
+
+        handle @404 {
+            rewrite * /404.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @502 {
+            rewrite * /502.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @503 {
+            rewrite * /503.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+
+        handle @504 {
+            rewrite * /504.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
+}

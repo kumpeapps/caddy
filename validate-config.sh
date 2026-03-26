@@ -5,9 +5,20 @@
 
 set -euo pipefail
 
+# Auto-detect if running in Docker container vs dev container
+if [ -f "/.dockerenv" ] && [ -d "/sites" ]; then
+    # Running in Docker container
+    DEFAULT_SITES_DIR="/sites"
+    DEFAULT_CADDYFILE="/etc/caddy/Caddyfile"
+else
+    # Running in dev container or locally
+    DEFAULT_SITES_DIR="/workspaces/caddy/sites"
+    DEFAULT_CADDYFILE="/workspaces/caddy/Caddyfile"
+fi
+
 CADDY_BINARY="${CADDY_BINARY:-caddy}"
-SITES_DIR="${SITES_DIR:-/workspaces/caddy/sites}"
-MAIN_CADDYFILE="${MAIN_CADDYFILE:-/workspaces/caddy/Caddyfile}"
+SITES_DIR="${SITES_DIR:-$DEFAULT_SITES_DIR}"
+MAIN_CADDYFILE="${MAIN_CADDYFILE:-$DEFAULT_CADDYFILE}"
 TEMP_DIR=$(mktemp -d)
 
 # Colors for output

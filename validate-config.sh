@@ -10,15 +10,18 @@ if [ -f "/.dockerenv" ] && [ -d "/sites" ]; then
     # Running in Docker container
     DEFAULT_SITES_DIR="/sites"
     DEFAULT_CADDYFILE="/etc/caddy/Caddyfile"
+    DEFAULT_SNIPPETS_DIR="/usr/local/share/caddy"
 else
     # Running in dev container or locally
     DEFAULT_SITES_DIR="/workspaces/caddy/sites"
     DEFAULT_CADDYFILE="/workspaces/caddy/Caddyfile"
+    DEFAULT_SNIPPETS_DIR="/workspaces/caddy/sites"
 fi
 
 CADDY_BINARY="${CADDY_BINARY:-caddy}"
 SITES_DIR="${SITES_DIR:-$DEFAULT_SITES_DIR}"
 MAIN_CADDYFILE="${MAIN_CADDYFILE:-$DEFAULT_CADDYFILE}"
+SNIPPETS_DIR="${SNIPPETS_DIR:-$DEFAULT_SNIPPETS_DIR}"
 TEMP_DIR=$(mktemp -d)
 
 # Colors for output
@@ -94,8 +97,8 @@ if [ -d "$SITES_DIR" ]; then
     # Test validation
 }
 
-import $SITES_DIR/_snippets.inc
-import $SITES_DIR/_matchers.inc
+import $SNIPPETS_DIR/_snippets.inc
+import $SNIPPETS_DIR/_matchers.inc
 import $config_file
 EOF
 

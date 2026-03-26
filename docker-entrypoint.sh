@@ -18,8 +18,43 @@ if [ -w "${sites_dir}" ] || mkdir -p "${sites_dir}" 2>/dev/null; then
     if [ ! -f "${redirect_dst}" ]; then
         cp "${redirect_src}" "${redirect_dst}" 2>/dev/null || echo "Note: /sites is read-only, skipping example file copy"
     fi
+
+    # Auto-inject error handling into site configs that don't already have it
+    # This makes error pages automatic without needing manual configuration
+    echo "Checking site configs for error handling..."
+    for config_file in "${sites_dir}"/*.caddy; do
+        # Skip if no .caddy files exist or if it's an example file
+        if [ ! -f "$config_file" ] || [ "$config_file" = "${sites_dir}/*.caddy" ]; then
+            continue
+        fi
+
+        filename=$(basename "$config_file")
+
+        # Skip example files and special configs
+        case "$filename" in
+            *.example|000-fallback.caddy)
+                continue
+                ;;
+        esac
+
+        # Check if file already has error handling
+        if ! grep -q "handle_errors\|import.*error_pages\|import auto_error_pages" "$config_file"; then
+            echo "  Adding automatic error handling to: $filename"
+            # Create temp file with error handling injected before the closing brace
+            # Find the last closing brace and inject error handling before it
+            awk '
+            /^}$/ && !done {
+                print "    # Auto-injected error handling (remove this and add your own if needed)"
+                print "    import auto_error_pages"
+                print ""
+                done=1
+            }
+            { print }
+            ' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+        fi
+    done
 else
-    echo "Note: /sites is read-only, skipping example file creation"
+    echo "Note: /sites is read-only, skipping example file creation and auto-injection"
 fi
 
 if [ "$#" -eq 0 ]; then

@@ -11,20 +11,24 @@ if [ -f "/.dockerenv" ] && [ -d "/sites" ]; then
     DEFAULT_SITES_DIR="/sites"
     DEFAULT_BACKUP_DIR="/sites-backup"
     DEFAULT_CADDYFILE="/etc/caddy/Caddyfile"
+    DEFAULT_SNIPPETS_DIR="/usr/local/share/caddy"
 else
     # Running in dev container or locally
     DEFAULT_SITES_DIR="/workspaces/caddy/sites"
     DEFAULT_BACKUP_DIR="/workspaces/caddy/sites-backup"
     DEFAULT_CADDYFILE="/workspaces/caddy/Caddyfile"
+    DEFAULT_SNIPPETS_DIR="/workspaces/caddy/sites"
 fi
 
 CADDY_BINARY="${CADDY_BINARY:-caddy}"
 SITES_DIR="${SITES_DIR:-$DEFAULT_SITES_DIR}"
 BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
 MAIN_CADDYFILE="${MAIN_CADDYFILE:-$DEFAULT_CADDYFILE}"
+SNIPPETS_DIR="${SNIPPETS_DIR:-$DEFAULT_SNIPPETS_DIR}"
 AUTO_BACKUP=false
 AUTO_DELETE=false
 DELETE_PROMPT=false
+RESTORE_INVALID=false
 TEMP_DIR=$(mktemp -d)
 
 # Parse arguments
@@ -44,6 +48,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Default behavior (no options):"
+            echo "  Validates all configs, temporarily hides invalid ones, reloads Caddy"
+            echo "  with valid configs only, then restores invalid configs so you can fix them."
+            echo "  This allows Caddy to run with valid sites while preserving broken configs."
             echo ""
             echo "Options:"
             echo "  --auto-backup    Automatically move invalid configs to backup directory"
@@ -176,8 +185,8 @@ while IFS= read -r -d '' config_file; do
     # Test validation
 }
 
-import $SITES_DIR/_snippets.inc
-import $SITES_DIR/_matchers.inc
+import $SNIPPETS_DIR/_snippets.inc
+import $SNIPPETS_DIR/_matchers.inc
 import $config_file
 EOF
 
@@ -214,16 +223,18 @@ if [ ${#invalid_configs[@]} -gt 0 ]; then
     if [ "$IS_READONLY" = true ]; then
         echo -e "${RED}Cannot proceed with read-only mount.${NC}"
         echo ""
-        echo "With read-only mounts, you must:"
+        echo "With read-only mounts, invalid configs cannot be temporarily hidden."
+        echo ""
+        echo "You must:"
         echo "  1. Fix the errors in your source repository"
         echo "  2. Commit and push the changes"
         echo "  3. Redeploy/remount the updated configs"
         echo "  4. Run this script again"
         echo ""
-        echo "Alternatively, to temporarily exclude these configs:"
+        echo "Or permanently exclude these configs:"
         echo "  - Rename them to *.example in your source"
         echo "  - Remove them from your source"
-        echo "  - Use import globs that exclude them"
+        echo "  - Update import globs to exclude them"
         exit 1
     elif [ "$AUTO_BACKUP" = true ]; then
         echo -e "${YELLOW}Auto-backup enabled. Moving invalid configs...${NC}"
@@ -284,14 +295,26 @@ if [ ${#invalid_configs[@]} -gt 0 ]; then
             exit 1
         fi
     else
-        echo -e "${YELLOW}Invalid configs found but auto-backup disabled.${NC}"
-        echo "Options:"
-        echo "  1. Run with --auto-backup to automatically move invalid configs"
-        echo "  2. Run with --auto-delete to automatically delete invalid configs"
-        echo "  3. Run with --delete to delete with confirmation prompt"
-        echo "  4. Manually fix or remove invalid configs"
-        echo "  5. Rename them to *.example to exclude from loading"
-        exit 1
+        echo -e "${YELLOW}Invalid configs found. Using safe reload mode.${NC}"
+        echo "Temporarily renaming invalid configs so Caddy can reload with valid ones..."
+        echo ""
+
+        # Temporarily rename invalid configs
+        for config in "${invalid_configs[@]}"; do
+            filename=$(basename "$config")
+            mv "$config" "${config}.invalid"
+            echo -e "  ${YELLOW}Renamed:${NC} $filename → ${filename}.invalid (temporary)"
+        done
+        echo ""
+        echo -e "${GREEN}Caddy will reload with valid configs only.${NC}"
+        echo -e "${YELLOW}Invalid configs preserved for you to fix later.${NC}"
+        echo ""
+        echo "After reload, invalid configs will be renamed back to .caddy"
+        echo "You can fix them and run safe-reload.sh again."
+        echo ""
+
+        # Set flag to rename them back after reload
+        RESTORE_INVALID=true
     fi
 fi
 
@@ -300,7 +323,21 @@ echo "Reloading Caddy..."
 if "$CADDY_BINARY" reload --config "$MAIN_CADDYFILE" --adapter caddyfile; then
     echo -e "${GREEN}✓ Caddy reloaded successfully!${NC}"
 
-    if [ ${#invalid_configs[@]} -gt 0 ]; then
+    # Restore temporarily renamed invalid configs
+    if [ "$RESTORE_INVALID" = true ]; then
+        echo ""
+        echo "Restoring invalid configs to original names..."
+        for config in "${invalid_configs[@]}"; do
+            if [ -f "${config}.invalid" ]; then
+                filename=$(basename "$config")
+                mv "${config}.invalid" "$config"
+                echo -e "  ${GREEN}Restored:${NC} ${filename}.invalid → $filename"
+            fi
+        done
+        echo ""
+        echo -e "${YELLOW}Note: ${#invalid_configs[@]} invalid config(s) are present but ignored by Caddy${NC}"
+        echo "Fix the errors and run safe-reload.sh again to include them."
+    elif [ ${#invalid_configs[@]} -gt 0 ]; then
         echo ""
         if [ "$AUTO_BACKUP" = true ]; then
             echo -e "${YELLOW}Note: ${#invalid_configs[@]} config(s) were backed up and excluded${NC}"
@@ -311,5 +348,15 @@ if "$CADDY_BINARY" reload --config "$MAIN_CADDYFILE" --adapter caddyfile; then
     fi
 else
     echo -e "${RED}✗ Caddy reload failed${NC}"
+
+    # Restore invalid configs if reload failed
+    if [ "$RESTORE_INVALID" = true ]; then
+        echo "Restoring temporarily renamed configs..."
+        for config in "${invalid_configs[@]}"; do
+            if [ -f "${config}.invalid" ]; then
+                mv "${config}.invalid" "$config"
+            fi
+        done
+    fi
     exit 1
 fi

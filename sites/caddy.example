@@ -8,28 +8,31 @@
 www.example.com, example.com, privacy.example.com {
     # Automatic HTTPS with CloudNS DNS-01 challenge
     import cloudns_dns
-    
+
     # Security headers for all responses
     import security_headers
-    
+
     # Basic bot protection
     import bot_protection
-    
+
     # Block common exploit attempts
     import exploit_protection
-    
+
     # General rate limiting (300 req/min per IP)
     import rate_limit_general
-    
+
     # Enable compression
     import compression
-    
+
     # Cache static assets
     import static_cache
-    
+
     # Enable logging
     import log_common
-    
+
+    # Custom error pages for backend errors (502, 503, 504)
+    import error_pages_backend
+
     # Redirect apex domain to www
     import apex_to_www
 

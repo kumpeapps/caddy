@@ -5,10 +5,23 @@
 
 set -euo pipefail
 
+# Auto-detect if running in Docker container vs dev container
+if [ -f "/.dockerenv" ] && [ -d "/sites" ]; then
+    # Running in Docker container
+    DEFAULT_SITES_DIR="/sites"
+    DEFAULT_BACKUP_DIR="/sites-backup"
+    DEFAULT_CADDYFILE="/etc/caddy/Caddyfile"
+else
+    # Running in dev container or locally
+    DEFAULT_SITES_DIR="/workspaces/caddy/sites"
+    DEFAULT_BACKUP_DIR="/workspaces/caddy/sites-backup"
+    DEFAULT_CADDYFILE="/workspaces/caddy/Caddyfile"
+fi
+
 CADDY_BINARY="${CADDY_BINARY:-caddy}"
-SITES_DIR="${SITES_DIR:-/workspaces/caddy/sites}"
-BACKUP_DIR="${BACKUP_DIR:-/workspaces/caddy/sites-backup}"
-MAIN_CADDYFILE="${MAIN_CADDYFILE:-/workspaces/caddy/Caddyfile}"
+SITES_DIR="${SITES_DIR:-$DEFAULT_SITES_DIR}"
+BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
+MAIN_CADDYFILE="${MAIN_CADDYFILE:-$DEFAULT_CADDYFILE}"
 AUTO_BACKUP=false
 AUTO_DELETE=false
 DELETE_PROMPT=false
@@ -40,9 +53,12 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Environment Variables:"
             echo "  CADDY_BINARY     Path to caddy binary (default: caddy)"
-            echo "  SITES_DIR        Path to sites directory (default: /workspaces/caddy/sites)"
-            echo "  BACKUP_DIR       Path to backup directory (default: /workspaces/caddy/sites-backup)"
-            echo "  MAIN_CADDYFILE   Path to main Caddyfile (default: /workspaces/caddy/Caddyfile)"
+            echo "  SITES_DIR        Path to sites directory"
+            echo "                   (auto-detected: /sites in container, /workspaces/caddy/sites in dev)"
+            echo "  BACKUP_DIR       Path to backup directory"
+            echo "                   (auto-detected: /sites-backup in container, /workspaces/caddy/sites-backup in dev)"
+            echo "  MAIN_CADDYFILE   Path to main Caddyfile"
+            echo "                   (auto-detected: /etc/caddy/Caddyfile in container, /workspaces/caddy/Caddyfile in dev)"
             exit 0
             ;;
         *)

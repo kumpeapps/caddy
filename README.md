@@ -12,6 +12,7 @@ A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge
 - 🚀 Easy deployment with Docker
 - 📝 Example configurations included
 - 🔧 30+ reusable configuration snippets
+- 🎨 Custom graphical error pages for better UX
 
 ## Plugins Included
 
@@ -564,6 +565,50 @@ example.com {
 
 See [sites/example-with-snippets.caddy](sites/example-with-snippets.caddy) for complete working examples.
 
+## Custom Error Pages
+
+Professional, user-friendly error pages with modern responsive design similar to BunkerWeb.
+
+### Available Error Pages
+
+- **404** - Page or domain not found (blue theme)
+- **502** - Bad Gateway - upstream server error (purple theme)
+- **503** - Service Unavailable - maintenance/high load (pink theme)
+- **504** - Gateway Timeout - upstream timeout (orange theme)
+
+### Usage
+
+Import error page snippets in your site configuration:
+
+```caddyfile
+example.com {
+    # Show custom error pages for backend errors (recommended for reverse proxies)
+    import error_pages_backend
+
+    reverse_proxy localhost:8080
+}
+```
+
+Available snippets:
+
+- `error_pages_backend` - Handles 502, 503, 504 (backend/upstream errors)
+- `error_pages_404` - Handles 404 (page not found)
+- `error_pages_all` - Handles all common error codes (404, 502, 503, 504)
+
+### Unconfigured Domains
+
+The setup includes a fallback handler (`000-fallback.caddy`) that automatically shows the 404 error page for any domain not explicitly configured in your Caddy setup.
+
+### Error Page Features
+
+- 📱 Fully responsive design
+- 🎨 Modern gradient backgrounds (unique color for each error)
+- 💡 User-friendly guidance and troubleshooting tips
+- 🔄 "Try Again" button for easy refresh
+- ⚡ Zero dependencies (inline CSS, no CDN)
+
+See [error-pages/README.md](error-pages/README.md) for customization options.
+
 ## Example Files
 
 - **caddy.example**: Basic reverse proxy with redirects
@@ -654,33 +699,94 @@ docker run --rm -v $PWD/sites:/sites caddy-custom caddy fmt --overwrite /sites/y
 
 Caddy validates all configuration files on startup. If any file has errors, Caddy will fail to start. This protects against misconfigurations but can be disruptive if you have multiple sites and one has an error.
 
+### Using Scripts in Docker Container
+
+The validation and reload scripts are included in the Docker image at `/usr/bin/` and can be executed directly:
+
+```bash
+# Inside a running container - scripts auto-detect paths
+docker compose exec caddy validate-config.sh
+docker compose exec caddy safe-reload.sh
+
+# Or with docker run
+docker exec my-caddy-container validate-config.sh
+docker exec my-caddy-container safe-reload.sh --auto-backup
+```
+
+**Note:** The scripts automatically detect if they're running inside a Docker container and use the correct paths (`/sites`, `/etc/caddy/Caddyfile`). No need to set environment variables manually.
+
+### Accessing the Container Shell
+
+The container includes bash for running management scripts and interactive debugging:
+
+```bash
+# Access bash shell in running container
+docker compose exec caddy bash
+
+# Or with plain docker
+docker exec -it my-caddy-container bash
+```
+
+Once inside the container, you can run commands directly:
+
+```bash
+# Inside the container
+validate-config.sh
+safe-reload.sh --auto-backup
+caddy validate --config /etc/caddy/Caddyfile
+```
+
 ### Validation Scripts
 
 This repository includes helper scripts to validate configurations before reloading:
 
 #### validate-config.sh
 
-Validates all site configs individually and reports errors without making changes:
+Validates all site configs individually and reports errors without making changes.
+
+**Usage in Docker container:**
 
 ```bash
-# Make the script executable
+# Inside running container (auto-detects paths)
+docker compose exec caddy validate-config.sh
+```
+
+**Usage locally or in dev container:**
+
+```bash
+# Make the script executable (if needed)
 chmod +x validate-config.sh
 
 # Validate all configurations
 ./validate-config.sh
 
-# With custom paths (example)
-SITES_DIR=/sites \
-  MAIN_CADDYFILE=/etc/caddy/Caddyfile \
+# With custom paths (optional)
+SITES_DIR=/custom/path/sites \
+  MAIN_CADDYFILE=/custom/path/Caddyfile \
   ./validate-config.sh
 ```
 
 #### safe-reload.sh
 
-Validates configs, optionally backs up or deletes invalid ones, and reloads Caddy:
+Validates configs, optionally backs up or deletes invalid ones, and reloads Caddy.
+
+**Usage in Docker container:**
 
 ```bash
-# Make the script executable
+# Validate and prompt for action
+docker compose exec caddy safe-reload.sh
+
+# Automatically backup invalid configs and reload
+docker compose exec caddy safe-reload.sh --auto-backup
+
+# Show help and all options
+docker compose exec caddy safe-reload.sh --help
+```
+
+**Usage locally or in dev container:**
+
+```bash
+# Make the script executable (if needed)
 chmod +x safe-reload.sh
 
 # Validate and prompt for action

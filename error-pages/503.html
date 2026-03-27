@@ -5,7 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>503 Service Unavailable</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #060606;
+            --panel: #111111;
+            --panel-2: #181818;
+            --text: #F5F5F5;
+            --muted: #B7B7B7;
+            --green: #7EDB28;
+            --green-2: #9df14a;
+            --border: #262626;
+            --radius: 22px;
+            --shadow: 0 18px 40px rgba(0, 0, 0, .32);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,9 +29,9 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: #333;
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -24,13 +40,14 @@
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 60px 40px;
-            max-width: 600px;
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow), 0 0 40px rgba(126, 219, 40, 0.15);
+            padding: 50px 40px;
+            max-width: 650px;
             text-align: center;
-            animation: fadeIn 0.5s ease-in;
+            animation: fadeIn 0.6s ease-in;
         }
 
         @keyframes fadeIn {
@@ -45,50 +62,75 @@
             }
         }
 
-        .error-code {
-            font-size: 120px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            line-height: 1;
-            margin-bottom: 20px;
+        .logo {
+            width: 240px;
+            height: 240px;
+            margin: 0 auto 30px;
+            filter: drop-shadow(0 0 24px rgba(126, 219, 40, .18));
+            background: transparent;
         }
 
-        .error-icon {
-            font-size: 80px;
-            margin-bottom: 30px;
+        .logo img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .error-code {
+            font-size: 120px;
+            font-weight: 800;
+            color: var(--green);
+            line-height: .95;
+            margin-bottom: 20px;
+            letter-spacing: -0.05em;
+        }
+
+        .kicker {
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: .14em;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
         }
 
         h1 {
-            color: #2d3748;
-            font-size: 32px;
-            margin-bottom: 20px;
-            font-weight: 600;
+            color: var(--text);
+            font-size: 40px;
+            line-height: 1.08;
+            letter-spacing: -0.03em;
+            margin-bottom: 18px;
+            font-weight: 700;
         }
 
         p {
-            color: #718096;
+            color: var(--muted);
             font-size: 18px;
             line-height: 1.6;
-            margin-bottom: 15px;
+            margin-bottom: 14px;
+        }
+
+        p strong {
+            color: var(--text);
         }
 
         .info-box {
-            background: #f7fafc;
-            border-left: 4px solid #f5576c;
-            padding: 20px;
+            background: rgba(126, 219, 40, 0.05);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green);
+            padding: 24px;
             margin: 30px 0;
             text-align: left;
-            border-radius: 8px;
+            border-radius: 14px;
         }
 
         .info-box h2 {
-            color: #2d3748;
-            font-size: 18px;
-            margin-bottom: 15px;
-            font-weight: 600;
+            color: var(--green);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            margin-bottom: 16px;
+            font-weight: 700;
         }
 
         .info-box ul {
@@ -97,49 +139,64 @@
         }
 
         .info-box li {
-            color: #4a5568;
-            padding: 8px 0;
-            padding-left: 25px;
+            color: var(--text);
+            padding: 10px 0;
+            padding-left: 28px;
             position: relative;
             font-size: 16px;
         }
 
         .info-box li:before {
-            content: "•";
-            color: #f5576c;
+            content: "→";
+            color: var(--green);
             font-weight: bold;
             position: absolute;
             left: 0;
-            font-size: 20px;
+            font-size: 18px;
         }
 
         .button {
             display: inline-block;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 15px 40px;
-            border-radius: 50px;
+            background: var(--green);
+            color: #000;
+            padding: 14px 32px;
+            border-radius: 14px;
             text-decoration: none;
-            font-weight: 600;
-            margin-top: 20px;
-            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 700;
+            letter-spacing: .02em;
+            margin-top: 24px;
+            transition: all 0.2s ease;
             font-size: 16px;
+            border: 1px solid transparent;
         }
 
         .button:hover {
+            background: var(--green-2);
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(245, 87, 108, 0.4);
+            box-shadow: 0 8px 20px rgba(126, 219, 40, 0.3);
         }
 
         .footer {
-            margin-top: 30px;
-            color: #a0aec0;
+            margin-top: 40px;
+            color: var(--muted);
             font-size: 14px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer strong {
+            color: var(--green);
+            font-weight: 700;
         }
 
         @media (max-width: 768px) {
             .container {
-                padding: 40px 25px;
+                padding: 40px 28px;
+            }
+
+            .logo {
+                width: 192px;
+                height: 192px;
             }
 
             .error-code {
@@ -147,11 +204,15 @@
             }
 
             h1 {
-                font-size: 24px;
+                font-size: 28px;
             }
 
             p {
                 font-size: 16px;
+            }
+
+            .info-box {
+                padding: 20px;
             }
         }
     </style>
@@ -159,7 +220,11 @@
 
 <body>
     <div class="container">
-        <div class="error-icon">🛠️</div>
+        <div class="logo">
+            <img src="../logo.png" alt="Kumpe Apps">
+        </div>
+
+        <div class="kicker">Error 503</div>
         <div class="error-code">503</div>
         <h1>Application Unavailable</h1>
         <p>You've successfully reached the <strong>KumpeApps Deployment Server</strong>, but the requested application
@@ -178,7 +243,7 @@
         <a href="javascript:window.location.reload();" class="button">Try Again</a>
 
         <div class="footer">
-            Powered by KumpeApps LLC Deployment Server
+            Powered by <strong>KumpeApps</strong> Deployment Server
         </div>
     </div>
 </body>

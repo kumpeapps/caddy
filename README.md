@@ -1,6 +1,17 @@
-# Caddy Docker Setup
+<div align="center">
+  <img src="logo.png" alt="KumpeApps Deployment Server" width="200">
+  
+  # KumpeApps Deployment Server
+  ### Powered by Caddy
+  
+  <p><em>Production-ready Caddy web server implementation for the KumpeApps infrastructure</em></p>
+</div>
 
-A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge support, comprehensive bot protection, CAPTCHA-free spam protection, and advanced security features.
+---
+
+## Overview
+
+A production-ready Caddy web server setup with automatic HTTPS, DNS-01 challenge support, comprehensive bot protection, CAPTCHA-free spam protection, and advanced security features. This is the official KumpeApps Deployment Server implementation of Caddy.
 
 ## Features
 

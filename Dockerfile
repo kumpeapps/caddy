@@ -15,7 +15,7 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 # Alpine base image only includes /bin/sh by default
 RUN apk add --no-cache bash
 
-RUN mkdir -p /sites /sites-backup /usr/local/share/caddy
+RUN mkdir -p /sites /sites-backup /usr/local/share/caddy /usr/local/share/caddy/sites/global-assets
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY sites/caddy.example /usr/local/share/caddy/caddy.example
 COPY sites/redirect.example /usr/local/share/caddy/redirect.example

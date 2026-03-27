@@ -19,6 +19,13 @@ if [ -w "${sites_dir}" ] || mkdir -p "${sites_dir}" 2>/dev/null; then
         cp "${redirect_src}" "${redirect_dst}" 2>/dev/null || echo "Note: /sites is read-only, skipping example file copy"
     fi
 
+    # Create global-assets directory if it doesn't exist
+    global_assets_dir="${sites_dir}/global-assets"
+    if [ ! -d "${global_assets_dir}" ]; then
+        mkdir -p "${global_assets_dir}" 2>/dev/null || echo "Note: Failed to create global-assets directory"
+        echo "Created global-assets directory at ${global_assets_dir}"
+    fi
+
     # Auto-inject error handling into site configs that don't already have it
     # This makes error pages automatic without needing manual configuration
     echo "Checking site configs for error handling..."

@@ -1,9 +1,9 @@
 <div align="center">
   <img src="logo.png" alt="KumpeApps Deployment Server" width="200">
-  
+
   # KumpeApps Deployment Server
   ### Powered by Caddy
-  
+
   <p><em>Production-ready Caddy web server implementation for the KumpeApps infrastructure</em></p>
 </div>
 

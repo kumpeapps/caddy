@@ -176,7 +176,7 @@ EOF
             echo ""
             ((invalid_count++))
         fi
-        done < <(find "$dir" -type f \( -name "*.caddy" -o -name "*.conf" -o ! -name "*.*" \) -print0 2>/dev/null)
+        done < <(find "$dir" -maxdepth 1 -type f \( -name "*.caddy" -o -name "*.conf" \) ! -name ".*" -print0 2>/dev/null)
     done
 
     echo ""

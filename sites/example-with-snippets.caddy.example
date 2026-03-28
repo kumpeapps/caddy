@@ -4,37 +4,34 @@
 # Matchers must be imported per-site or defined inline (as shown in these examples)
 
 # =============================================================================
-# EXAMPLE 1: Basic Website with Security
+# EXAMPLE 1: Basic Website with Security (Simplified)
 # =============================================================================
 www.example.com, example.com {
-    # CloudNS DNS-01 challenge
-    import cloudns_dns
-    
+    # SSL + error pages + compression in one line
+    import ssl_defaults
+
     # Redirect apex to www
     @apex host example.com
     redir @apex https://www.example.com{uri} permanent
-    
+
     # Security headers
     import security_headers
-    
+
     # Basic bot protection
     import bot_protection
-    
+
     # Exploit protection
     import exploit_protection
-    
+
     # General rate limiting
     import rate_limit_general
-    
-    # Compression
-    import compression
-    
+
     # Static asset caching
     import static_cache
-    
+
     # Logging
     import log_common
-    
+
     # Reverse proxy to application
     reverse_proxy http://127.0.0.1:8080 {
         import reverse_proxy_defaults
@@ -45,11 +42,10 @@ www.example.com, example.com {
 # EXAMPLE 2: API Server with CORS
 # =============================================================================
 api.example.com {
-    import cloudns_dns
+    import ssl_defaults
     import security_headers
     import bot_protection_strict
-    import compression
-    
+
     # API rate limiting
     @api path /api/*
     handle @api {
@@ -59,7 +55,7 @@ api.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # Login endpoint with strict rate limiting
     @login path /login /auth/*
     handle @login {
@@ -68,13 +64,13 @@ api.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # Health check (no rate limit)
     @health path /health /healthz
     handle @health {
         reverse_proxy http://127.0.0.1:3000
     }
-    
+
     # Default
     reverse_proxy http://127.0.0.1:3000 {
         import reverse_proxy_defaults
@@ -86,13 +82,13 @@ api.example.com {
 # =============================================================================
 static.example.com {
     import cloudns_dns
+    import site_defaults
     import security_headers
-    import compression
     import static_cache
-    
+
     # Lenient rate limiting for static content
     import rate_limit_lenient
-    
+
     root * /var/www/html
     import file_server_defaults
 }
@@ -102,17 +98,18 @@ static.example.com {
 # =============================================================================
 admin.example.com {
     import cloudns_dns
+    import site_defaults
     import security_headers_strict
     import exploit_protection
-    
+
     # Very strict rate limiting
     import rate_limit_strict
-    
+
     # Uncomment and configure basic auth
     # basicauth {
     #     admin $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG
     # }
-    
+
     reverse_proxy http://127.0.0.1:9000 {
         import reverse_proxy_defaults
     }
@@ -128,7 +125,7 @@ shop.example.com {
     import exploit_protection
     import compression
     import log_detailed
-    
+
     # Admin section - protected
     @admin path /admin/*
     handle @admin {
@@ -138,7 +135,7 @@ shop.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # Checkout - strict rate limiting
     @checkout path /checkout /payment /order
     handle @checkout {
@@ -147,7 +144,7 @@ shop.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # API endpoints
     @api path /api/*
     handle @api {
@@ -157,7 +154,7 @@ shop.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # Static assets - aggressive caching
     handle @static_assets {
         import static_cache
@@ -165,7 +162,7 @@ shop.example.com {
             import reverse_proxy_defaults
         }
     }
-    
+
     # Default handler
     import rate_limit_general
     reverse_proxy http://127.0.0.1:8080 {

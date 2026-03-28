@@ -3,6 +3,24 @@
 # Then use individual snippets with: import snippet_name
 
 # =============================================================================
+# SITE DEFAULTS (includes error pages)
+# =============================================================================
+# Import this to get automatic error pages and other sensible defaults
+# Usage in your site config: import site_defaults
+(site_defaults) {
+    # Auto error pages - provides custom 404, 502, 503, 504 pages
+    import auto_error_pages
+
+    # Compression for better performance
+    import compression
+}
+
+# Minimal defaults (just error pages, no extras)
+(minimal_defaults) {
+    import auto_error_pages
+}
+
+# =============================================================================
 # SECURITY HEADERS
 # =============================================================================
 (security_headers) {
@@ -303,6 +321,14 @@
         propagation_timeout -1
         resolvers 1.1.1.1 8.8.8.8
     }
+}
+
+# SSL/HTTPS defaults with CloudNS
+# Combines CloudNS DNS-01 challenge with site defaults (error pages + compression)
+# This is the most common starting point for HTTPS sites
+(ssl_defaults) {
+    import cloudns_dns
+    import site_defaults
 }
 
 # =============================================================================

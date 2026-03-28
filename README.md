@@ -433,7 +433,7 @@ Simply use any snippet with the `import` directive in your .caddy files:
 
 ```caddyfile
 your-domain.com {
-    import cloudns_dns
+    import ssl_defaults        # SSL + error pages + compression
     import security_headers
     import bot_protection
     import rate_limit_general
@@ -443,6 +443,31 @@ your-domain.com {
 ```
 
 ### Available Snippets
+
+#### Essential Defaults
+
+- `ssl_defaults` - **Recommended starting point** - Includes CloudNS DNS-01, error pages, and compression
+- `site_defaults` - Error pages and compression (no SSL config)
+- `minimal_defaults` - Just error pages, no extras
+
+**Quick Start:** Add `import ssl_defaults` to your site config to automatically get HTTPS with CloudNS DNS-01, custom error pages (404, 502, 503, 504), and compression. This is the recommended starting point for most sites.
+
+```caddyfile
+your-domain.com {
+    import ssl_defaults        # SSL + error pages + compression in one line
+    import security_headers
+
+    reverse_proxy http://localhost:8080
+}
+```
+
+If you need SSL with a different provider or want more control, use the individual snippets:
+
+```caddyfile
+your-domain.com {
+    import cloudns_dns         # or your own tls config
+    import site_defaults       # error pages + compression
+```
 
 #### Security
 
@@ -522,7 +547,7 @@ example.com {
     # Import matchers inside the site block
     import /usr/local/share/caddy/_matchers.inc
 
-    import cloudns_dns
+    import ssl_defaults
     import security_headers
 
     # Now you can use the matchers
@@ -542,9 +567,8 @@ example.com {
 
 ```caddyfile
 example.com {
-    import cloudns_dns
+    import ssl_defaults
     import security_headers
-    import compression
 
     # Block bots and exploits
     import bot_protection

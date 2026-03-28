@@ -424,3 +424,6 @@ else
     fi
     exit 1
 fi
+
+# Success - exit with 0
+exit 0

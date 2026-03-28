@@ -215,3 +215,4 @@ fi
 
 echo ""
 echo "Ready to reload Caddy safely."
+exit 0

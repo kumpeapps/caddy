@@ -168,7 +168,7 @@ EOF
 
         if "$CADDY_BINARY" validate --config "$TEMP_DIR/test.Caddyfile" --adapter caddyfile 2>"$TEMP_DIR/error.log"; then
             echo -e "${GREEN}✓ Valid${NC}"
-            ((valid_count++))
+            ((valid_count++)) || true
         else
             echo -e "${RED}✗ Invalid${NC}"
             echo -e "${YELLOW}    Error details:${NC}"

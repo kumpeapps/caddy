@@ -6,8 +6,8 @@
 # Note: Snippets are automatically imported globally in Caddyfile
 
 www.example.com, example.com, privacy.example.com {
-    # Automatic HTTPS with CloudNS DNS-01 challenge
-    import cloudns_dns
+    # SSL/HTTPS + error pages + compression in one line
+    import ssl_defaults
 
     # Security headers for all responses
     import security_headers
@@ -21,17 +21,11 @@ www.example.com, example.com, privacy.example.com {
     # General rate limiting (300 req/min per IP)
     import rate_limit_general
 
-    # Enable compression
-    import compression
-
     # Cache static assets
     import static_cache
 
     # Enable logging
     import log_common
-
-    # Custom error pages for backend errors (502, 503, 504)
-    import error_pages_backend
 
     # Redirect apex domain to www
     import apex_to_www

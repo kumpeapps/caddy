@@ -14,11 +14,20 @@
 (global_maintenance_gate) {
     @maintenance_all expression `{env.MAINTENANCE_ALL} == "1" || {env.MAINTENANCE_ALL} == "true"`
 
-    @maintenance_stage expression `({env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true") && contains({host}, ".stage.")`
+    @maintenance_stage {
+        expression `{env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true"`
+        host *.stage.*
+    }
 
-    @maintenance_dev expression `({env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true") && contains({host}, ".dev.")`
+    @maintenance_dev {
+        expression `{env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true"`
+        host *.dev.*
+    }
 
-    @maintenance_prod expression `({env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true") && !contains({host}, ".stage.") && !contains({host}, ".dev.")`
+    @maintenance_prod {
+        expression `{env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true"`
+        not host *.stage.* *.dev.*
+    }
 
     # Keep maintenance page assets available while maintenance is active.
     handle /error-assets/* {

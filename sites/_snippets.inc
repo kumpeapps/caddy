@@ -10,21 +10,22 @@
 #   MAINTENANCE_PROD=1  -> domains NOT containing .stage. or .dev.
 #   MAINTENANCE_STAGE=1 -> domains containing .stage.
 #   MAINTENANCE_DEV=1   -> domains containing .dev.
+# Also supports value "true" for each toggle.
 (global_maintenance_gate) {
-    @maintenance_all expression `{env.MAINTENANCE_ALL} == "1"`
+    @maintenance_all expression `{env.MAINTENANCE_ALL} == "1" || {env.MAINTENANCE_ALL} == "true"`
 
     @maintenance_stage {
-        expression `{env.MAINTENANCE_STAGE} == "1"`
+        expression `{env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true"`
         host *.stage.*
     }
 
     @maintenance_dev {
-        expression `{env.MAINTENANCE_DEV} == "1"`
+        expression `{env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true"`
         host *.dev.*
     }
 
     @maintenance_prod {
-        expression `{env.MAINTENANCE_PROD} == "1"`
+        expression `{env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true"`
         not host *.stage.* *.dev.*
     }
 

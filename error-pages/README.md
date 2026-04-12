@@ -8,6 +8,8 @@ Professional, responsive error pages with modern design inspired by BunkerWeb.
 - **502.html** - Bad Gateway (upstream server error)
 - **503.html** - Service Unavailable (maintenance/high load)
 - **504.html** - Gateway Timeout (upstream server timeout)
+- **maintenance.html** - Dedicated planned maintenance page
+- **deployment-in-progress.html** - Dedicated active deployment page
 
 ## Features
 

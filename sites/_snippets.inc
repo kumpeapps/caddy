@@ -5,9 +5,52 @@
 # =============================================================================
 # SITE DEFAULTS (includes error pages)
 # =============================================================================
+# Global maintenance toggles (environment variables):
+#   MAINTENANCE_ALL=1   -> all domains
+#   MAINTENANCE_PROD=1  -> domains NOT containing .stage. or .dev.
+#   MAINTENANCE_STAGE=1 -> domains containing .stage.
+#   MAINTENANCE_DEV=1   -> domains containing .dev.
+(global_maintenance_gate) {
+    @maintenance_all expression `{env.MAINTENANCE_ALL} == "1"`
+
+    @maintenance_stage {
+        expression `{env.MAINTENANCE_STAGE} == "1"`
+        host *.stage.*
+    }
+
+    @maintenance_dev {
+        expression `{env.MAINTENANCE_DEV} == "1"`
+        host *.dev.*
+    }
+
+    @maintenance_prod {
+        expression `{env.MAINTENANCE_PROD} == "1"`
+        not host *.stage.* *.dev.*
+    }
+
+    handle @maintenance_all {
+        import maintenance_mode
+    }
+
+    handle @maintenance_stage {
+        import maintenance_mode
+    }
+
+    handle @maintenance_dev {
+        import maintenance_mode
+    }
+
+    handle @maintenance_prod {
+        import maintenance_mode
+    }
+}
+
 # Import this to get automatic error pages and other sensible defaults
 # Usage in your site config: import site_defaults
 (site_defaults) {
+    # Optional global maintenance override by env var and hostname group.
+    import global_maintenance_gate
+
     # Auto error pages - provides custom 404, 502, 503, 504 pages
     import auto_error_pages
 
@@ -17,6 +60,7 @@
 
 # Minimal defaults (just error pages, no extras)
 (minimal_defaults) {
+    import global_maintenance_gate
     import auto_error_pages
 }
 
@@ -438,8 +482,54 @@
 # MAINTENANCE MODE
 # =============================================================================
 (maintenance_mode) {
-    header Retry-After "3600"
-    respond "We're currently performing maintenance. Please check back soon!" 503
+    # Ensure maintenance page assets are always available.
+    handle /error-assets/* {
+        uri strip_prefix /error-assets
+        root * /usr/local/share/caddy/error-pages
+        file_server
+    }
+
+    handle {
+        header Retry-After "3600"
+        error 503
+    }
+
+    handle_errors {
+        @maintenance expression {http.error.status_code} == 503
+
+        handle @maintenance {
+            rewrite * /maintenance.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
+}
+
+# =============================================================================
+# DEPLOYMENT IN PROGRESS MODE
+# =============================================================================
+(deployment_in_progress_mode) {
+    # Ensure deployment page assets are always available.
+    handle /error-assets/* {
+        uri strip_prefix /error-assets
+        root * /usr/local/share/caddy/error-pages
+        file_server
+    }
+
+    handle {
+        header Retry-After "120"
+        error 503
+    }
+
+    handle_errors {
+        @deployment expression {http.error.status_code} == 503
+
+        handle @deployment {
+            rewrite * /deployment-in-progress.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
+    }
 }
 
 # =============================================================================

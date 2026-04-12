@@ -178,6 +178,11 @@ shop.example.com {
 #     import maintenance_mode
 # }
 
+# deployment.example.com {
+#     import cloudns_dns
+#     import deployment_in_progress_mode
+# }
+
 # =============================================================================
 # EXAMPLE 7: Environment Banner Wrapper
 # =============================================================================

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment In Progress</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #060606;
+            --panel: #111111;
+            --panel-2: #181818;
+            --text: #F5F5F5;
+            --muted: #B7B7B7;
+            --green: #7EDB28;
+            --green-2: #9df14a;
+            --border: #262626;
+            --radius: 22px;
+            --shadow: 0 18px 40px rgba(0, 0, 0, .32);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow), 0 0 40px rgba(126, 219, 40, 0.15);
+            padding: 40px 36px;
+            max-width: 760px;
+            text-align: center;
+            animation: fadeIn 0.6s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            width: 220px;
+            margin: 0 auto 20px;
+            filter: drop-shadow(0 0 24px rgba(126, 219, 40, .18));
+        }
+
+        .logo img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .kicker {
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: .14em;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            color: var(--text);
+            font-size: 40px;
+            line-height: 1.08;
+            letter-spacing: -0.03em;
+            margin-bottom: 14px;
+            font-weight: 700;
+        }
+
+        p {
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        p strong {
+            color: var(--text);
+        }
+
+        .hero {
+            margin: 28px auto 22px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            background: rgba(126, 219, 40, 0.04);
+            box-shadow: inset 0 0 0 1px rgba(126, 219, 40, 0.08);
+            max-width: 680px;
+        }
+
+        .hero img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .info-box {
+            background: rgba(126, 219, 40, 0.05);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green);
+            padding: 22px;
+            margin: 22px 0;
+            text-align: left;
+            border-radius: 14px;
+        }
+
+        .info-box h2 {
+            color: var(--green);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            margin-bottom: 14px;
+            font-weight: 700;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            color: var(--text);
+            padding: 9px 0;
+            padding-left: 28px;
+            position: relative;
+            font-size: 16px;
+        }
+
+        .info-box li:before {
+            content: "->";
+            color: var(--green);
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            font-size: 17px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            color: var(--muted);
+            font-size: 14px;
+            padding-top: 22px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer strong {
+            color: var(--green);
+            font-weight: 700;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 22px;
+            }
+
+            .logo {
+                width: 176px;
+                margin-bottom: 16px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            p {
+                font-size: 16px;
+            }
+
+            .info-box {
+                padding: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="/error-assets/logo.webp" alt="Kumpe Apps">
+        </div>
+
+        <div class="kicker">Deployment In Progress</div>
+        <h1>A new release is being deployed</h1>
+        <p>The <strong>KumpeApps Deployment Server</strong> is currently rolling out an update.</p>
+        <p>This page will become available again as soon as deployment health checks pass.</p>
+
+        <div class="hero">
+            <img src="/error-assets/deployment_in_progress_collab.png" alt="Deployment in progress illustration">
+        </div>
+
+        <div class="info-box">
+            <h2>What to expect</h2>
+            <ul>
+                <li>Traffic is temporarily paused while the release is applied</li>
+                <li>Instances are validated before normal traffic resumes</li>
+                <li>Please refresh in a few minutes</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            Powered by <strong>KumpeApps</strong> Deployment Server
+        </div>
+    </div>
+</body>
+
+</html>

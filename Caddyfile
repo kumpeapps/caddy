@@ -5,6 +5,7 @@
 
 	# Global error handling for all sites
 	# Shows custom error pages automatically without needing to add them to each site
+	order injection after encode
 	servers {
 		protocols h1 h2 h3
 	}

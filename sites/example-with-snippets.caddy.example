@@ -177,3 +177,30 @@ shop.example.com {
 #     import cloudns_dns
 #     import maintenance_mode
 # }
+
+# =============================================================================
+# EXAMPLE 7: Environment Banner Wrapper
+# =============================================================================
+# This wraps top-level browser navigations in a visible environment banner while
+# proxying the app itself directly inside an iframe.
+#
+# Notes:
+# - Intended for browser-based dev/stage environments.
+# - The snippet removes X-Frame-Options and Content-Security-Policy headers from
+#   framed app responses so the app can render inside the wrapper.
+# - API clients, assets, WebSockets, and iframe navigations still reach your
+#   normal handlers directly.
+#
+# dev.example.com {
+#     import ssl_defaults
+#     import security_headers
+#     import dev_env
+#     reverse_proxy http://127.0.0.1:8080
+# }
+#
+# stage.example.com {
+#     import ssl_defaults
+#     import security_headers
+#     import stage_env
+#     reverse_proxy http://127.0.0.1:8080
+# }

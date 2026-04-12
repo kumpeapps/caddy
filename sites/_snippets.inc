@@ -23,148 +23,30 @@
 # =============================================================================
 # ENVIRONMENT BANNERS
 # =============================================================================
- # Wrap top-level browser HTML navigations in a visible environment frame while
- # letting the site's normal handlers, including reverse_proxy, serve the app.
+ # Inject a visible top banner and colored border into HTML responses while
+ # keeping normal routing and reverse_proxy behavior unchanged.
  # Usage:
  #     import dev_env
  #     reverse_proxy http://127.0.0.1:8080
 (environment_banner) {
-    @environment_banner_frame path /_env_frame/*
-
-    @environment_banner_page {
+    @environment_banner_html {
         method GET
-        not path /_env_frame/*
-        header Sec-Fetch-Dest document
         header Accept *text/html*
     }
 
-    # Route iframe requests to the normal site handlers after stripping the
-    # internal prefix used by the wrapper page.
-    uri @environment_banner_frame strip_prefix /_env_frame
-
-    # Allow the framed application to render even if the upstream sets headers
-    # that would block same-origin embedding.
-    header @environment_banner_frame -X-Frame-Options
-    header @environment_banner_frame -Content-Security-Policy
-
-    respond @environment_banner_page <<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex,nofollow">
-    <title>{args[0]} Environment</title>
-    <style>
-        :root {
-            color-scheme: light;
-            --env-accent: {args[1]};
-            --env-accent-soft: {args[2]};
-            --env-text: #1b1b1b;
-            --env-surface: #fffaf7;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html,
-        body {
-            margin: 0;
-            min-height: 100%;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(180deg, var(--env-accent-soft) 0%, #ffffff 160px);
-            color: var(--env-text);
-        }
-
-        body {
-            border: 8px solid var(--env-accent);
-        }
-
-        .env-shell {
-            min-height: 100vh;
-            display: grid;
-            grid-template-rows: auto 1fr;
-        }
-
-        .env-banner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 0.85rem 1.25rem;
-            background: var(--env-accent);
-            color: #ffffff;
-            font-size: 0.95rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
-        }
-
-        .env-banner strong {
-            font-size: 1rem;
-        }
-
-        .env-banner span {
-            opacity: 0.92;
-        }
-
-        .env-app {
-            min-height: 0;
-            padding: 0;
-        }
-
-        .env-app iframe {
-            display: block;
-            width: 100%;
-            height: calc(100vh - 66px);
-            border: 0;
-            background: #ffffff;
-        }
-
-        @media (max-width: 720px) {
-            body {
-                border-width: 6px;
-            }
-
-            .env-banner {
-                align-items: flex-start;
-                flex-direction: column;
-                padding: 0.9rem 1rem;
-            }
-
-            .env-app iframe {
-                height: calc(100vh - 92px);
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="env-shell">
-        <div class="env-banner">
-            <strong>{args[0]} environment</strong>
-            <span>Use this instance for testing only.</span>
-        </div>
-        <div class="env-app">
-            <iframe
-                src="/_env_frame{uri}"
-                title="{args[0]} environment application"
-                referrerpolicy="same-origin"
-            ></iframe>
-        </div>
-    </div>
-</body>
-</html>
-HTML 200
+    injection @environment_banner_html {
+        inject {args[1]}
+        before "</body>"
+        content_type ^text/html$
+    }
 }
 
 (dev_env) {
-    import environment_banner dev #c62828 #fdeaea
+    import environment_banner dev /usr/local/share/caddy/sites/global-assets/dev-env-banner.html
 }
 
 (stage_env) {
-    import environment_banner stage #ef6c00 #fff2e3
+    import environment_banner stage /usr/local/share/caddy/sites/global-assets/stage-env-banner.html
 }
 
 (env_banner_dev) {
@@ -556,9 +438,8 @@ HTML 200
 # MAINTENANCE MODE
 # =============================================================================
 (maintenance_mode) {
-    respond "We're currently performing maintenance. Please check back soon!" 503 {
-        header Retry-After "3600"
-    }
+    header Retry-After "3600"
+    respond "We're currently performing maintenance. Please check back soon!" 503
 }
 
 # =============================================================================

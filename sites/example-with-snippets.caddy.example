@@ -181,15 +181,12 @@ shop.example.com {
 # =============================================================================
 # EXAMPLE 7: Environment Banner Wrapper
 # =============================================================================
-# This wraps top-level browser navigations in a visible environment banner while
-# proxying the app itself directly inside an iframe.
+# This injects a visible environment banner and colored border into HTML pages.
 #
 # Notes:
 # - Intended for browser-based dev/stage environments.
-# - The snippet removes X-Frame-Options and Content-Security-Policy headers from
-#   framed app responses so the app can render inside the wrapper.
-# - API clients, assets, WebSockets, and iframe navigations still reach your
-#   normal handlers directly.
+# - Works with your normal reverse_proxy config below the snippet import.
+# - Requires the caddy2-html-injection-plugin in the Caddy binary.
 #
 # dev.example.com {
 #     import ssl_defaults

@@ -100,10 +100,12 @@
         header Accept *text/html*
     }
 
-    injection @environment_banner_html {
-        inject {args[1]}
-        before "</body>"
-        content_type ^text/html$
+    route {
+        injection @environment_banner_html {
+            inject {args[1]}
+            before "</body>"
+            content_type ^text/html$
+        }
     }
 }
 

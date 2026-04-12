@@ -28,20 +28,41 @@
         not host *.stage.* *.dev.*
     }
 
+    # Keep maintenance page assets available while maintenance is active.
+    handle /error-assets/* {
+        uri strip_prefix /error-assets
+        root * /usr/local/share/caddy/error-pages
+        file_server
+    }
+
     handle @maintenance_all {
-        import maintenance_mode
+        header Retry-After "3600"
+        error 503
     }
 
     handle @maintenance_stage {
-        import maintenance_mode
+        header Retry-After "3600"
+        error 503
     }
 
     handle @maintenance_dev {
-        import maintenance_mode
+        header Retry-After "3600"
+        error 503
     }
 
     handle @maintenance_prod {
-        import maintenance_mode
+        header Retry-After "3600"
+        error 503
+    }
+
+    handle_errors {
+        @maintenance expression {http.error.status_code} == 503
+
+        handle @maintenance {
+            rewrite * /maintenance.html
+            root * /usr/local/share/caddy/error-pages
+            file_server
+        }
     }
 }
 

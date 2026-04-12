@@ -14,20 +14,11 @@
 (global_maintenance_gate) {
     @maintenance_all expression `{env.MAINTENANCE_ALL} == "1" || {env.MAINTENANCE_ALL} == "true"`
 
-    @maintenance_stage {
-        expression `{env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true"`
-        host *.stage.*
-    }
+    @maintenance_stage expression `({env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true") && {host}.matches("(^|\\.)stage\\..+")`
 
-    @maintenance_dev {
-        expression `{env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true"`
-        host *.dev.*
-    }
+    @maintenance_dev expression `({env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true") && {host}.matches("(^|\\.)dev\\..+")`
 
-    @maintenance_prod {
-        expression `{env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true"`
-        not host *.stage.* *.dev.*
-    }
+    @maintenance_prod expression `({env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true") && !{host}.matches("(^|\\.)stage\\..+") && !{host}.matches("(^|\\.)dev\\..+")`
 
     # Keep maintenance page assets available while maintenance is active.
     handle /error-assets/* {
@@ -54,16 +45,6 @@
     handle @maintenance_prod {
         header Retry-After "3600"
         error 503
-    }
-
-    handle_errors {
-        @maintenance expression {http.error.status_code} == 503
-
-        handle @maintenance {
-            rewrite * /maintenance.html
-            root * /usr/local/share/caddy/error-pages
-            file_server
-        }
     }
 }
 
@@ -117,12 +98,21 @@
     import environment_banner stage /usr/local/share/caddy/sites/global-assets/stage-env-banner.html
 }
 
+(prod_env) {
+    # Maintenance toggles are handled centrally in global_maintenance_gate
+    # via site_defaults (imported by ssl_defaults).
+}
+
 (env_banner_dev) {
     import dev_env
 }
 
 (env_banner_stage) {
     import stage_env
+}
+
+(env_banner_prod) {
+    import prod_env
 }
 
 # =============================================================================
@@ -465,9 +455,6 @@
 (reverse_proxy_defaults) {
     # Common headers for reverse proxy
     header_up X-Real-IP {remote_host}
-    header_up X-Forwarded-For {remote_host}
-    header_up X-Forwarded-Proto {scheme}
-    header_up X-Forwarded-Host {host}
 }
 
 # =============================================================================
@@ -506,27 +493,9 @@
 # MAINTENANCE MODE
 # =============================================================================
 (maintenance_mode) {
-    # Ensure maintenance page assets are always available.
-    handle /error-assets/* {
-        uri strip_prefix /error-assets
-        root * /usr/local/share/caddy/error-pages
-        file_server
-    }
-
-    handle {
-        header Retry-After "3600"
-        error 503
-    }
-
-    handle_errors {
-        @maintenance expression {http.error.status_code} == 503
-
-        handle @maintenance {
-            rewrite * /maintenance.html
-            root * /usr/local/share/caddy/error-pages
-            file_server
-        }
-    }
+    # This snippet is intentionally safe to import inside a handle block.
+    header Retry-After "3600"
+    error 503
 }
 
 # =============================================================================

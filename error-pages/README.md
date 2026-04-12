@@ -4,7 +4,17 @@ Professional, responsive error pages with modern design inspired by BunkerWeb.
 
 ## Available Error Pages
 
+- **400.html** - Bad Request
+- **401.html** - Unauthorized
+- **403.html** - Forbidden
 - **404.html** - Page or domain not found
+- **408.html** - Request Timeout
+- **409.html** - Conflict
+- **418.html** - I'm a teapot
+- **422.html** - Unprocessable Entity
+- **429.html** - Too Many Requests
+- **451.html** - Unavailable For Legal Reasons
+- **500.html** - Internal Server Error
 - **502.html** - Bad Gateway (upstream server error)
 - **503.html** - Service Unavailable (maintenance/high load)
 - **504.html** - Gateway Timeout (upstream server timeout)

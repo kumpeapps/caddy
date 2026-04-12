@@ -29,10 +29,39 @@
 	}
 
 	handle_errors {
+		@400 expression {http.error.status_code} == 400
+		@401 expression {http.error.status_code} == 401
+		@403 expression {http.error.status_code} == 403
 		@404 expression {http.error.status_code} == 404
+		@408 expression {http.error.status_code} == 408
+		@409 expression {http.error.status_code} == 409
+		@418 expression {http.error.status_code} == 418
+		@422 expression {http.error.status_code} == 422
+		@429 expression {http.error.status_code} == 429
+		@451 expression {http.error.status_code} == 451
+		@500 expression {http.error.status_code} == 500
 		@502 expression {http.error.status_code} == 502
 		@503 expression {http.error.status_code} == 503
 		@504 expression {http.error.status_code} == 504
+		@maintenance_503 expression `{http.error.status_code} == 503 && (({env.MAINTENANCE_ALL} == "1" || {env.MAINTENANCE_ALL} == "true") || (({env.MAINTENANCE_STAGE} == "1" || {env.MAINTENANCE_STAGE} == "true") && {host}.matches("(^|\\.)stage\\..+")) || (({env.MAINTENANCE_DEV} == "1" || {env.MAINTENANCE_DEV} == "true") && {host}.matches("(^|\\.)dev\\..+")) || (({env.MAINTENANCE_PROD} == "1" || {env.MAINTENANCE_PROD} == "true") && !{host}.matches("(^|\\.)stage\\..+") && !{host}.matches("(^|\\.)dev\\..+")))`
+
+		handle @400 {
+			rewrite * /400.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @401 {
+			rewrite * /401.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @403 {
+			rewrite * /403.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
 
 		handle @404 {
 			rewrite * /404.html
@@ -40,8 +69,56 @@
 			file_server
 		}
 
+		handle @408 {
+			rewrite * /408.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @409 {
+			rewrite * /409.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @418 {
+			rewrite * /418.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @422 {
+			rewrite * /422.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @429 {
+			rewrite * /429.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @451 {
+			rewrite * /451.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @500 {
+			rewrite * /500.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
 		handle @502 {
 			rewrite * /502.html
+			root * /usr/local/share/caddy/error-pages
+			file_server
+		}
+
+		handle @maintenance_503 {
+			rewrite * /maintenance.html
 			root * /usr/local/share/caddy/error-pages
 			file_server
 		}
